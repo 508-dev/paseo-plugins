@@ -48,7 +48,4 @@ jobs:
       - run: npm ci --legacy-peer-deps --ignore-scripts --no-audit --no-fund
       - run: npm run typecheck
       - run: npm run lint --if-present
-      - run: npm test -- --bail=1
-        if: matrix.plugin != 'worktreeinclude'
       - run: npm test
-        if: matrix.plugin == 'worktreeinclude'
