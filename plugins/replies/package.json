@@ -1,0 +1,42 @@
+{
+  "name": "@508-dev/paseo-replies",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Suggested next replies you can edit before sending, with a configurable Claude model.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/508-dev/paseo-plugins.git",
+    "directory": "plugins/replies"
+  },
+  "files": [
+    "paseo-plugin.json",
+    "OVERVIEW.md",
+    "LICENSE",
+    "index.client.tsx",
+    "index.server.ts",
+    "client/",
+    "server/",
+    "shared/"
+  ],
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "oxlint --config .oxlintrc.json",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check ."
+  },
+  "devDependencies": {
+    "@getpaseo/plugin": "0.16.0-beta.2",
+    "@types/node": "^22.0.0",
+    "@types/react": "~19.2.0",
+    "oxfmt": "0.46.0",
+    "oxlint": "1.61.0",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7",
+    "zod": "^4.4.3"
+  }
+}

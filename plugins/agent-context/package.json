@@ -1,0 +1,40 @@
+{
+  "name": "@508-dev/paseo-agent-context",
+  "version": "0.1.0",
+  "description": "Attach bounded Paseo agent transcript snapshots to prompts",
+  "homepage": "https://github.com/508-dev/paseo-plugins/tree/main/plugins/agent-context#readme",
+  "bugs": {
+    "url": "https://github.com/508-dev/paseo-plugins/issues"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/508-dev/paseo-plugins.git",
+    "directory": "plugins/agent-context"
+  },
+  "files": [
+    "paseo-plugin.json",
+    "index.client.ts",
+    "index.server.ts",
+    "server/",
+    "shared/",
+    "LICENSE",
+    "OVERVIEW.md"
+  ],
+  "type": "module",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@getpaseo/plugin": "0.9.1",
+    "@types/node": "^20.9.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.6",
+    "zod": "^4.4.3"
+  }
+}

@@ -1,0 +1,7 @@
+Control a browser running on a Paseo host, or forward a host dev site to a local browser through Paseo's existing connection. The Host browser workspace panel streams Chrome frames and forwards pointer, keyboard, scroll, and touch input. Each workspace has an isolated browser context that lasts while the plugin runs.
+
+Requires Paseo 0.16.0-beta.1 or later on both host and client, Node 22+, and Chrome or Chromium installed on the host. Set PASEO_BROWSER_EXECUTABLE if the browser is outside standard locations. puppeteer-core does not download a browser. Native clients provide touch gestures and a keyboard input; physical-device and IME behavior remain unverified.
+
+The dev-site forwarding companion runs on the viewing computer and exposes an ephemeral loopback URL. It supports HTTP and WebSocket traffic without rewriting site content. It requires Node on the viewing computer; phone integration is not implemented. Authorized clients can select any host IPv4 loopback port, so access is not limited to workspace scripts.
+
+Browser and forwarding traffic uses the selected Paseo connection. Direct connections use their configured security; paired relay connections use Paseo's endpoint encryption. The plugin opens no inbound host port and changes no relay configuration. Browser contexts reset on plugin restart, and disconnect or workspace archive closes the associated streams and tunnels. Full desktop shell, iOS/Android device behavior, and production-relay operation have not been verified.
