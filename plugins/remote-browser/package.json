@@ -18,7 +18,7 @@
     "forward": "node --experimental-strip-types companion/forward.mjs"
   },
   "dependencies": {
-    "puppeteer-core": "24.26.1"
+    "puppeteer-core": "25.17.0"
   },
   "devDependencies": {
     "@getpaseo/client": "0.16.0-beta.1",
