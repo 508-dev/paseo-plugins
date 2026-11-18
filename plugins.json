@@ -6,7 +6,7 @@
     "description": "Save project variables and use them in agent commands without reopening sessions.",
     "package": "@508-dev/paseo-project-environment",
     "version": "0.2.1",
-    "paseo": ">=0.13.2",
+    "paseo": ">=0.13.0",
     "registryId": null,
     "source": {
       "repository": "https://github.com/508-dev/paseo-project-environment",
@@ -102,7 +102,7 @@
     "description": "Suggested next replies you can edit before sending, with a configurable Claude model.",
     "package": "@508-dev/paseo-replies",
     "version": "0.2.0",
-    "paseo": ">=0.16.0-beta.2",
+    "paseo": ">=0.16.0-beta.1",
     "registryId": null,
     "source": {
       "repository": "https://github.com/508-dev/paseo-replies",
@@ -118,7 +118,7 @@
     "description": "Paseo plugin that copies or symlinks gitignored files into new worktrees.",
     "package": "@508-dev/paseo-worktreeinclude",
     "version": "0.1.1",
-    "paseo": ">=0.10.3",
+    "paseo": ">=0.8.0",
     "registryId": null,
     "source": {
       "repository": "https://github.com/508-dev/paseo-worktreeinclude",
