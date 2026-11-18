@@ -255,6 +255,9 @@ export function InboxScreen({ theme, layout, navigation }: PluginScreenProps) {
               card={card}
               theme={theme}
               compact={layout.compact}
+              tapToOpen={
+                layout.compact || layout.platform === "ios" || layout.platform === "android"
+              }
               unread={readReady ? isUnread(card, read) : null}
               readDisabled={!readReady || preferences.saving}
               onToggleRead={() => void setRead([card], isUnread(card, read))}
