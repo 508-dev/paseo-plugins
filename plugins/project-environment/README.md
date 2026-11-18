@@ -20,19 +20,19 @@ You can also paste that Git source into **Settings → Plugins → Plugin source
 
 1. Open a workspace in Paseo.
 2. Open the Command Center with **⌘K** on macOS or **Ctrl+K** on Windows/Linux, then choose **Project environment**.
-3. Under **Add variable**, enter its name, description, and value. For example:
+3. Choose **Project defaults** to share the variable across the project's workspaces, or **Workspace variables** to keep it in the current workspace. Under **Add variable**, enter its name, description, and value. For example:
    - **Name:** `STRIPE_API_KEY`
    - **Description:** `Stripe test-mode key for reading customers`
    - **Value:** Paste your key into the value field. Choose **Show value** to check your input and **Hide value** to mask it again.
 4. Select **Add variable**. The panel confirms the addition and lists the name and description. Values stay hidden until you choose **Reveal** or **Copy**.
 
-Variables belong to the project. Git worktrees of the same repository share them; separate non-Git directories have separate variables.
+Git worktrees of the same repository inherit the same project defaults. To override a default, add a variable with the same name under **Workspace variables**. A workspace can also define its own names. Removing a workspace override restores the project default on the next command. Existing saved variables are project defaults.
 
 ## Find variables across projects
 
 Open **Environment variables** from the sidebar, or choose **Search environment variables** in the Command Center. Search by name or description to find matching variables across projects and workspaces on the selected host. Values are excluded from the search response and are never used for matching.
 
-Results show the project, its directory when available, and the workspaces sharing those variables. Choose **Open variables** beside a workspace to manage its variables. Saved variables remain listed when there is no active workspace; older entries whose project cannot be identified appear under **Unidentified project**. Use **Refresh** to reload the list after changes elsewhere.
+Results show project defaults and variables saved in individual active workspaces. Choose **Open variables** beside a workspace to manage both scopes. Project defaults remain listed when there is no active workspace. Older entries whose project cannot be identified appear under **Unidentified project**. Use **Refresh** to reload the list after changes elsewhere.
 
 ## Reveal or copy a value
 

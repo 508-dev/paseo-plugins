@@ -1,4 +1,4 @@
-import type { PluginServerContext } from "@getpaseo/plugin/server";
+import type { PluginHandlerContext, PluginServerContext } from "@getpaseo/plugin/server";
 import { homedir } from "node:os";
 import path from "node:path";
 import {
@@ -10,7 +10,13 @@ import {
 } from "./shared/environment";
 import { EnvironmentBroker, toolInstructions } from "./server/broker";
 import { buildVariableCatalogue, readWorkspaceDirectory } from "./server/catalogue";
-import { projectScope } from "./server/store";
+import { projectScope, workspaceScope } from "./server/store";
+
+async function resolveProject(paseo: PluginHandlerContext["paseo"], workspaceId: string) {
+  const workspace = await paseo.workspaces.ref(workspaceId).refresh();
+  if (!workspace) throw new Error("Workspace is unavailable");
+  return projectScope(workspace.workspaceDirectory);
+}
 
 export default function contribute(server: PluginServerContext) {
   const home = process.env.PASEO_HOME ?? path.join(homedir(), ".paseo");
@@ -61,30 +67,41 @@ export default function contribute(server: PluginServerContext) {
     await start();
     if (target.kind === "project")
       return { value: await broker.store.readValue({ id: target.scopeId }, name) };
-    const workspace = await paseo.workspaces.ref(target.workspaceId).refresh();
-    if (!workspace) throw new Error("Workspace is unavailable");
-    const scope = await projectScope(workspace.workspaceDirectory);
+    const scope = await workspaceScope(await resolveProject(paseo, target.workspaceId));
     return { value: await broker.store.readValue(scope, name) };
   });
   server.handle(listVariables, async ({ workspaceId }, { paseo }) => {
-    const workspace = await paseo.workspaces.ref(workspaceId).refresh();
-    if (!workspace) throw new Error("Workspace is unavailable");
     await start();
-    const variables = await broker.store.read(await projectScope(workspace.workspaceDirectory));
-    return { variables: variables.map(({ name, description }) => ({ name, description })) };
+    const project = await resolveProject(paseo, workspaceId);
+    const [variables, workspaceVariables] = await Promise.all([
+      broker.store.read(project),
+      broker.store.readWorkspace(project),
+    ]);
+    return {
+      scopeId: project.id,
+      variables: variables.map(({ name, description }) => ({ name, description })),
+      workspaceVariables: workspaceVariables.map(({ name, description }) => ({
+        name,
+        description,
+      })),
+    };
   });
-  server.handle(saveVariable, async ({ workspaceId, variable }, { paseo }) => {
-    const workspace = await paseo.workspaces.ref(workspaceId).refresh();
-    if (!workspace) throw new Error("Workspace is unavailable");
+  server.handle(saveVariable, async ({ workspaceId, scope, variable }, { paseo }) => {
     await start();
-    await broker.store.save(await projectScope(workspace.workspaceDirectory), variable);
+    const project = await resolveProject(paseo, workspaceId);
+    await broker.store.save(
+      scope === "workspace" ? await workspaceScope(project) : project,
+      variable,
+    );
     return {};
   });
-  server.handle(removeVariable, async ({ workspaceId, name }, { paseo }) => {
-    const workspace = await paseo.workspaces.ref(workspaceId).refresh();
-    if (!workspace) throw new Error("Workspace is unavailable");
+  server.handle(removeVariable, async ({ workspaceId, scope, name }, { paseo }) => {
     await start();
-    await broker.store.remove(await projectScope(workspace.workspaceDirectory), name);
+    const project = await resolveProject(paseo, workspaceId);
+    await broker.store.remove(
+      scope === "workspace" ? await workspaceScope(project) : project,
+      name,
+    );
     return {};
   });
   return async () => {

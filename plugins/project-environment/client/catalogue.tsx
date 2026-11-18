@@ -7,6 +7,7 @@ import {
   filterVariableCatalogue,
   variableCatalogue,
   type CatalogueProject,
+  type VariableTarget,
 } from "../shared/environment";
 import { ValueControls } from "./value";
 import { ActionButton } from "./action-button";
@@ -21,15 +22,20 @@ interface ProjectResultsProps {
   theme: PluginScreenProps["theme"];
   openEditor: OpenEditor;
 }
-interface WorkspaceLinkProps {
+interface WorkspaceResultsProps {
   workspace: CatalogueProject["workspaces"][number];
   openEditor: OpenEditor;
   theme: PluginScreenProps["theme"];
 }
-function WorkspaceLink({ workspace, openEditor, theme }: WorkspaceLinkProps) {
+function WorkspaceResults({ workspace, openEditor, theme }: WorkspaceResultsProps) {
   const open = useCallback(() => openEditor(workspace.id), [workspace.id, openEditor]);
+  const target = useMemo(
+    () => ({ kind: "workspace" as const, workspaceId: workspace.id }),
+    [workspace.id],
+  );
   const styles = useMemo(
     () => ({
+      section: { gap: 10 },
       row: {
         flexDirection: "row" as const,
         flexWrap: "wrap" as const,
@@ -41,9 +47,14 @@ function WorkspaceLink({ workspace, openEditor, theme }: WorkspaceLinkProps) {
     [theme],
   );
   return (
-    <View style={styles.row}>
-      <Text style={styles.name}>{workspace.name}</Text>
-      <ActionButton label="Open variables" onPress={open} theme={theme} />
+    <View style={styles.section}>
+      <View style={styles.row}>
+        <Text style={styles.name}>{workspace.name}</Text>
+        <ActionButton label="Open variables" onPress={open} theme={theme} />
+      </View>
+      {workspace.variables.map((variable) => (
+        <VariableResult key={variable.name} {...variable} target={target} theme={theme} />
+      ))}
     </View>
   );
 }
@@ -57,7 +68,49 @@ function ProjectResults({ project, theme, openEditor }: ProjectResultsProps) {
       section: { gap: 10 },
       title: { color: theme.colors.foreground, fontSize: 15, fontWeight: "600" as const },
       detail: { color: theme.colors.foregroundMuted, fontSize: 13 },
+    }),
+    [theme],
+  );
+  return (
+    <View style={styles.section}>
+      <Text style={styles.title}>{project.name}</Text>
+      <Text selectable style={styles.detail}>
+        {project.directory ?? "The original project location is unavailable."}
+      </Text>
+      {project.variables.length ? <Text style={styles.detail}>Project defaults</Text> : null}
+      {project.variables.map((variable) => (
+        <VariableResult key={variable.name} {...variable} target={target} theme={theme} />
+      ))}
+      {project.workspaces.map((workspace) => (
+        <WorkspaceResults
+          key={workspace.id}
+          workspace={workspace}
+          openEditor={openEditor}
+          theme={theme}
+        />
+      ))}
+      {!project.workspaces.length ? (
+        <Text style={styles.detail}>
+          No active workspace. Saved variables are still available here.
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+function VariableResult({
+  name,
+  description,
+  target,
+  theme,
+}: CatalogueProject["variables"][number] & {
+  target: VariableTarget;
+  theme: PluginScreenProps["theme"];
+}) {
+  const styles = useMemo(
+    () => ({
       name: { color: theme.colors.foreground, fontSize: 14, fontWeight: "600" as const },
+      detail: { color: theme.colors.foregroundMuted, fontSize: 13 },
       card: {
         padding: 16,
         gap: 10,
@@ -70,33 +123,12 @@ function ProjectResults({ project, theme, openEditor }: ProjectResultsProps) {
     [theme],
   );
   return (
-    <View style={styles.section}>
-      <Text style={styles.title}>{project.name}</Text>
-      <Text selectable style={styles.detail}>
-        {project.directory ?? "The original project location is unavailable."}
+    <View style={styles.card}>
+      <Text selectable style={styles.name}>
+        {name}
       </Text>
-      {project.variables.map((variable) => (
-        <View key={variable.name} style={styles.card}>
-          <Text selectable style={styles.name}>
-            {variable.name}
-          </Text>
-          {variable.description ? <Text style={styles.detail}>{variable.description}</Text> : null}
-          <ValueControls target={target} name={variable.name} theme={theme} />
-        </View>
-      ))}
-      {project.workspaces.map((workspace) => (
-        <WorkspaceLink
-          key={workspace.id}
-          workspace={workspace}
-          openEditor={openEditor}
-          theme={theme}
-        />
-      ))}
-      {!project.workspaces.length ? (
-        <Text style={styles.detail}>
-          No active workspace. Saved variables are still available here.
-        </Text>
-      ) : null}
+      {description ? <Text style={styles.detail}>{description}</Text> : null}
+      <ValueControls target={target} name={name} theme={theme} />
     </View>
   );
 }
@@ -134,7 +166,13 @@ export function VariableCatalogueScreen({ theme, layout, host, openEditor }: Cat
     void refetch();
   }, [refetch]);
   const projects = catalogue.data ? filterVariableCatalogue(catalogue.data.projects, query) : [];
-  const count = projects.reduce((total, project) => total + project.variables.length, 0);
+  const count = projects.reduce(
+    (total, project) =>
+      total +
+      project.variables.length +
+      project.workspaces.reduce((local, workspace) => local + workspace.variables.length, 0),
+    0,
+  );
   const variableLabel = count === 1 ? "variable" : "variables";
   const projectLabel = projects.length === 1 ? "project" : "projects";
   let emptyText =
@@ -195,7 +233,6 @@ export function VariableCatalogueScreen({ theme, layout, host, openEditor }: Cat
       ))}
       <Text style={styles.detail}>
         Values stay hidden until you choose Reveal or Copy. Revealed values hide after 30 seconds.
-        Worktrees share their project's variables.
       </Text>
     </ScrollView>
   );

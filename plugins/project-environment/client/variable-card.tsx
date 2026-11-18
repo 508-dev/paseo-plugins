@@ -5,11 +5,11 @@ import { ActionButton } from "./action-button";
 import { Field } from "./field";
 import { SavedVariableEditor } from "./saved-variable-editor";
 import { ValueControls } from "./value";
-import type { variableInput } from "../shared/environment";
+import type { variableInput, VariableTarget } from "../shared/environment";
 import type { z } from "zod";
 
 interface VariableCardProps {
-  workspaceId: string;
+  target: VariableTarget;
   name: string;
   description: string;
   theme: PluginTheme;
@@ -17,7 +17,7 @@ interface VariableCardProps {
   remove(name: string): Promise<void>;
 }
 export function VariableCard({
-  workspaceId,
+  target,
   name,
   description,
   theme,
@@ -36,7 +36,6 @@ export function VariableCard({
   const confirm = useCallback(() => {
     void editor.remove();
   }, [editor]);
-  const target = useMemo(() => ({ kind: "workspace" as const, workspaceId }), [workspaceId]);
   const styles = useMemo(
     () => ({
       card: {

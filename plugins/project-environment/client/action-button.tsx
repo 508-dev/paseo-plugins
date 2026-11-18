@@ -7,6 +7,7 @@ interface ActionButtonProps {
   onPress(): void;
   theme: PluginTheme;
   disabled?: boolean;
+  selected?: boolean;
   variant?: "outline" | "primary" | "destructive";
 }
 export function ActionButton({
@@ -14,8 +15,10 @@ export function ActionButton({
   onPress,
   theme,
   disabled = false,
+  selected,
   variant = "outline",
 }: ActionButtonProps) {
+  const accessibilityState = useMemo(() => ({ selected }), [selected]);
   const styles = useMemo(() => {
     let backgroundColor = "transparent";
     let color = theme.colors.foreground;
@@ -46,6 +49,7 @@ export function ActionButton({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={accessibilityState}
       disabled={disabled}
       onPress={onPress}
       style={styles.button}

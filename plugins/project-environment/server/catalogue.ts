@@ -53,7 +53,6 @@ export async function buildVariableCatalogue({
   resolveScope = projectScope,
 }: CatalogueOptions) {
   const saved = await store.catalogue();
-  if (!saved.length) return { projects: [], unavailableDirectories: 0 };
   const locations: Location[] = projects.map((project) => ({
     directory: project.projectRootPath,
     root: project.projectRootPath,
@@ -69,22 +68,44 @@ export async function buildVariableCatalogue({
         id: workspace.id,
         name: workspace.name,
         directory: workspace.workspaceDirectory,
+        variables: [],
       },
     });
   }
   const resolved = new Map<string, ProjectScope | null>();
+  const workspaceDirectories = new Set(
+    workspaces.map(({ workspaceDirectory }) => workspaceDirectory),
+  );
+  const localVariables = new Map<string, CatalogueProject["variables"]>();
   const directories = [...new Set(locations.map((location) => location.directory))];
   // Limit Git subprocesses while resolving worktree ownership, once per directory.
   for (let offset = 0; offset < directories.length; offset += 8) {
     await Promise.all(
       directories.slice(offset, offset + 8).map(async (directory) => {
+        let scope: ProjectScope;
         try {
-          resolved.set(directory, await resolveScope(directory));
+          scope = await resolveScope(directory);
         } catch {
           resolved.set(directory, null);
+          return;
+        }
+        resolved.set(directory, scope);
+        if (workspaceDirectories.has(directory)) {
+          const variables = await store.readWorkspace(scope);
+          localVariables.set(
+            directory,
+            variables.map(({ name, description }) => ({ name, description })),
+          );
         }
       }),
     );
+  }
+  const savedScopeIds = new Set(saved.map(({ scopeId }) => scopeId));
+  for (const [directory, variables] of localVariables) {
+    const scope = resolved.get(directory);
+    if (!variables.length || !scope || savedScopeIds.has(scope.id)) continue;
+    saved.push({ scopeId: scope.id, directory: null, variables: [] });
+    savedScopeIds.add(scope.id);
   }
   const result: CatalogueProject[] = saved.map((entry) => {
     const matches = locations.filter(
@@ -96,7 +117,12 @@ export async function buildVariableCatalogue({
       matches[0]?.name ?? (directory ? path.basename(directory) : "Unidentified project");
     const uniqueWorkspaces = new Map<string, CatalogueProject["workspaces"][number]>();
     for (const location of matches) {
-      if (location.workspace) uniqueWorkspaces.set(location.workspace.id, location.workspace);
+      if (location.workspace) {
+        uniqueWorkspaces.set(location.workspace.id, {
+          ...location.workspace,
+          variables: localVariables.get(location.directory) ?? [],
+        });
+      }
     }
     const availableWorkspaces = [...uniqueWorkspaces.values()].toSorted((a, b) =>
       a.name.localeCompare(b.name),

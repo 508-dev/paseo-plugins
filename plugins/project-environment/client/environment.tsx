@@ -19,7 +19,38 @@ export function EnvironmentPanel(props: PluginWorkspacePanelProps) {
   return <WorkspaceEnvironment key={`${props.host.id}:${props.workspaceId}`} {...props} />;
 }
 function WorkspaceEnvironment({ theme, layout, host, workspaceId }: PluginWorkspacePanelProps) {
+  const [scope, setScope] = useState<"project" | "workspace">("project");
+  const showProject = useCallback(() => setScope("project"), []);
+  const showWorkspace = useCallback(() => setScope("workspace"), []);
+  return (
+    <ScopedEnvironment
+      key={scope}
+      {...{ theme, layout, host, workspaceId, scope, showProject, showWorkspace }}
+    />
+  );
+}
+
+type ScopedEnvironmentProps = Pick<
+  PluginWorkspacePanelProps,
+  "theme" | "layout" | "host" | "workspaceId"
+> & {
+  scope: "project" | "workspace";
+  showProject(): void;
+  showWorkspace(): void;
+};
+
+function ScopedEnvironment({
+  theme,
+  layout,
+  host,
+  workspaceId,
+  scope,
+  showProject,
+  showWorkspace,
+}: ScopedEnvironmentProps) {
   const project = useWorkspace(workspaceId, (workspace) => workspace.projectDisplayName);
+  const workspaceName = useWorkspace(workspaceId, (workspace) => workspace.name);
+  const isProject = scope === "project";
   const list = useRpc(listVariables);
   const save = useRpc(saveVariable);
   const remove = useRpc(removeVariable);
@@ -38,19 +69,19 @@ function WorkspaceEnvironment({ theme, layout, host, workspaceId }: PluginWorksp
   const saveExisting = useCallback(
     async (variable: z.infer<typeof variableInput>) => {
       setNotice("");
-      await save({ workspaceId, variable });
+      await save({ workspaceId, scope, variable });
       await invalidate();
     },
-    [save, workspaceId, invalidate],
+    [save, workspaceId, scope, invalidate],
   );
   const removeExisting = useCallback(
     async (name: string) => {
       setNotice("");
-      await remove({ workspaceId, name });
+      await remove({ workspaceId, scope, name });
       setNotice(`${name} removed.`);
       await invalidate();
     },
-    [remove, workspaceId, invalidate],
+    [remove, workspaceId, scope, invalidate],
   );
   const [editor] = useState(() => new EnvironmentEditor({ save: saveExisting }));
   const form = useSyncExternalStore(editor.subscribe, editor.getState);
@@ -80,7 +111,7 @@ function WorkspaceEnvironment({ theme, layout, host, workspaceId }: PluginWorksp
         backgroundColor: theme.colors.surface1,
         gap: 12,
       },
-      actions: { flexDirection: "row" as const, gap: 8 },
+      actions: { flexDirection: "row" as const, flexWrap: "wrap" as const, gap: 8 },
     }),
     [theme, layout.compact],
   );
@@ -91,10 +122,16 @@ function WorkspaceEnvironment({ theme, layout, host, workspaceId }: PluginWorksp
   const setName = useCallback((text: string) => editor.set("name", text), [editor]);
   const setDescription = useCallback((text: string) => editor.set("description", text), [editor]);
   const setValue = useCallback((text: string) => editor.set("value", text), [editor]);
+  const data = variables.data;
+  const savedVariables = isProject ? data?.variables : data?.workspaceVariables;
+  const target = useMemo(() => {
+    if (!isProject) return { kind: "workspace" as const, workspaceId };
+    return data ? { kind: "project" as const, scopeId: data.scopeId } : null;
+  }, [data, isProject, workspaceId]);
   const submit = useCallback(() => {
-    const existingNames = variables.data?.variables.map((variable) => variable.name) ?? [];
+    const existingNames = savedVariables?.map((variable) => variable.name) ?? [];
     void editor.save(existingNames);
-  }, [editor, variables.data]);
+  }, [editor, savedVariables]);
   let messageStyle = styles.detail;
   if (form.status === "error") messageStyle = styles.error;
   if (form.status === "saved") messageStyle = styles.success;
@@ -105,10 +142,27 @@ function WorkspaceEnvironment({ theme, layout, host, workspaceId }: PluginWorksp
       keyboardShouldPersistTaps="handled"
     >
       <View style={styles.heading}>
-        <Text style={styles.title}>Project environment</Text>
+        <Text style={styles.title}>Environment</Text>
+        <View style={styles.actions}>
+          <ActionButton
+            label="Project defaults"
+            theme={theme}
+            onPress={showProject}
+            variant={isProject ? "primary" : "outline"}
+            selected={isProject}
+          />
+          <ActionButton
+            label="Workspace variables"
+            theme={theme}
+            onPress={showWorkspace}
+            variant={isProject ? "outline" : "primary"}
+            selected={!isProject}
+          />
+        </View>
         <Text style={styles.detail}>
-          Shared across {project ?? "this project"} and its worktrees. Changes apply to the next
-          environment command.
+          {isProject
+            ? `Shared across workspaces in ${project ?? "this project"}.`
+            : `Saved for ${workspaceName ?? "this workspace"} only. Add a name from Project defaults to override it here. Removing the override restores the project value.`}
         </Text>
       </View>
       <View style={styles.section}>
@@ -125,20 +179,19 @@ function WorkspaceEnvironment({ theme, layout, host, workspaceId }: PluginWorksp
             <ActionButton label="Retry" onPress={retry} theme={theme} />
           </>
         ) : null}
-        {variables.data?.variables.length === 0 ? (
-          <Text style={styles.detail}>No variables yet.</Text>
-        ) : null}
-        {variables.data?.variables.map((variable) => (
-          <VariableCard
-            key={variable.name}
-            workspaceId={workspaceId}
-            name={variable.name}
-            description={variable.description}
-            theme={theme}
-            save={saveExisting}
-            remove={removeExisting}
-          />
-        ))}
+        {savedVariables?.length === 0 ? <Text style={styles.detail}>No variables yet.</Text> : null}
+        {target &&
+          savedVariables?.map((variable) => (
+            <VariableCard
+              key={variable.name}
+              target={target}
+              name={variable.name}
+              description={variable.description}
+              theme={theme}
+              save={saveExisting}
+              remove={removeExisting}
+            />
+          ))}
       </View>
       <View style={styles.form}>
         <Text style={styles.subtitle}>Add variable</Text>
