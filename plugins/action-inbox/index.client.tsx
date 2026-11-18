@@ -4,7 +4,7 @@ import { useSettings } from "@getpaseo/plugin/client";
 import { Text } from "react-native";
 import { InboxScreen } from "./client/inbox-screen";
 import { useInbox } from "./client/use-inbox";
-import { isUnread } from "./client/inbox-model";
+import { filterCards } from "./client/inbox-model";
 import { inboxPreferences } from "./shared/preferences";
 
 export function InboxItem({ currentScreen, openScreen, theme }: PluginSidebarItemProps) {
@@ -12,7 +12,11 @@ export function InboxItem({ currentScreen, openScreen, theme }: PluginSidebarIte
   const preferences = useSettings(inboxPreferences);
   const count =
     preferences.status === "ready"
-      ? inbox.cards.filter((card) => isUnread(card, preferences.values.readTokens)).length
+      ? filterCards(
+          inbox.cards,
+          { showFailures: preferences.values.showFailures, unreadOnly: true },
+          preferences.values.readTokens,
+        ).length
       : 0;
   return (
     <SidebarRow

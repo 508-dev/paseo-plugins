@@ -5,5 +5,8 @@ export const inboxPreferences = defineSettings({
   id: "inbox",
   scope: "device",
   version: 1,
-  schema: z.object({ readTokens: z.record(z.string(), z.string()).default({}) }),
+  schema: z.object({
+    readTokens: z.record(z.string(), z.string()).default({}),
+    showFailures: z.boolean().default(false),
+  }),
 });

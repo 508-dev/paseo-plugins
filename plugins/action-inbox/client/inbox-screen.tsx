@@ -13,15 +13,22 @@ export function InboxScreen({ theme, layout, navigation }: PluginScreenProps) {
   const [hostId, setHostId] = useState<string | null>(null);
   const [projectKey, setProjectKey] = useState<string | null>(null);
   const [unreadOnly, setUnreadOnly] = useState(false);
-  const read = preferences.status === "ready" ? preferences.values.readTokens : {};
   const readReady = preferences.status === "ready";
-  const unreadCount = inbox.cards.filter((card) => isUnread(card, read)).length;
-  const visible = filterCards(inbox.cards, { hostId, projectKey, unreadOnly }, read);
-  const scopedUnreadCount = filterCards(
-    inbox.cards,
-    { hostId, projectKey, unreadOnly: true },
-    read,
-  ).length;
+  const read = readReady ? preferences.values.readTokens : {};
+  const showFailures = readReady && preferences.values.showFailures;
+  const attentionCount = filterCards(inbox.cards, { showFailures }, read).length;
+  const unreadCount = filterCards(inbox.cards, { showFailures, unreadOnly: true }, read).length;
+  const filters = { hostId, projectKey, showFailures };
+  const visible = filterCards(inbox.cards, { ...filters, unreadOnly }, read);
+  const scopedUnreadCount = filterCards(inbox.cards, { ...filters, unreadOnly: true }, read).length;
+  const hiddenUnreadFailures =
+    showFailures || !readReady
+      ? 0
+      : filterCards(
+          inbox.cards.filter((card) => card.kind === "failed"),
+          { ...filters, unreadOnly: true, showFailures: true },
+          read,
+        ).length;
   const onlineCount = inbox.hosts.filter((host) => host.status === "online").length;
   const projects = [
     ...new Map(
@@ -42,7 +49,15 @@ export function InboxScreen({ theme, layout, navigation }: PluginScreenProps) {
       ? markRead(preferences.values.readTokens, cards)
       : { ...preferences.values.readTokens };
     if (!value) for (const card of cards) delete next[card.key];
-    await preferences.save({ readTokens: next }, preferences.revision);
+    await preferences.save({ ...preferences.values, readTokens: next }, preferences.revision);
+  }
+
+  async function toggleFailures() {
+    if (preferences.status !== "ready" || preferences.saving) return;
+    await preferences.save(
+      { ...preferences.values, showFailures: !preferences.values.showFailures },
+      preferences.revision,
+    );
   }
 
   const muted = { color: theme.colors.foregroundMuted, fontSize: 12 };
@@ -62,7 +77,7 @@ export function InboxScreen({ theme, layout, navigation }: PluginScreenProps) {
         >
           <View style={{ gap: 3, flex: 1 }}>
             <Text style={{ color: theme.colors.foreground, fontSize: 17, fontWeight: "500" }}>
-              {inbox.loading ? "Action inbox" : `${inbox.cards.length} need attention`}
+              {inbox.loading ? "Action inbox" : `${attentionCount} need attention`}
             </Text>
             <Text style={muted}>
               {readReady
@@ -120,7 +135,7 @@ export function InboxScreen({ theme, layout, navigation }: PluginScreenProps) {
               gap: 4,
             }}
           >
-            <View style={{ flexDirection: "row", gap: 2 }}>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 2 }}>
               <InboxButton
                 theme={theme}
                 compact={layout.compact}
@@ -137,6 +152,20 @@ export function InboxScreen({ theme, layout, navigation }: PluginScreenProps) {
                 onPress={() => setUnreadOnly(true)}
               >
                 Unread{readReady ? ` ${scopedUnreadCount}` : ""}
+              </InboxButton>
+              <InboxButton
+                theme={theme}
+                compact={layout.compact}
+                selected={showFailures}
+                disabled={!readReady || preferences.saving}
+                onPress={() => void toggleFailures()}
+                label={
+                  hiddenUnreadFailures > 0
+                    ? `Show failures, ${hiddenUnreadFailures} hidden unread`
+                    : "Show failures"
+                }
+              >
+                Show failures{hiddenUnreadFailures > 0 ? ` (${hiddenUnreadFailures})` : ""}
               </InboxButton>
             </View>
             <InboxButton
@@ -173,14 +202,16 @@ export function InboxScreen({ theme, layout, navigation }: PluginScreenProps) {
         preferences.saveError ? (
           <View style={{ gap: 4 }}>
             <Text style={{ color: theme.colors.statusDanger, fontSize: 12 }}>
-              {preferences.saveError ? "Could not save read status" : "Could not load read status"}
+              {preferences.saveError
+                ? "Could not save inbox preferences"
+                : "Could not load inbox preferences"}
             </Text>
             <InboxButton
               theme={theme}
               compact={layout.compact}
               onPress={() => void preferences.reload()}
             >
-              Retry read status
+              Reload inbox preferences
             </InboxButton>
           </View>
         ) : null}

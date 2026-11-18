@@ -99,9 +99,10 @@ export function markRead(read: ReadTokens, cards: InboxCard[]): ReadTokens {
 }
 
 export interface InboxFilters {
-  hostId: string | null;
-  projectKey: string | null;
-  unreadOnly: boolean;
+  hostId?: string | null;
+  projectKey?: string | null;
+  unreadOnly?: boolean;
+  showFailures?: boolean;
 }
 
 export function filterCards(
@@ -111,6 +112,7 @@ export function filterCards(
 ): InboxCard[] {
   return cards.filter(
     (card) =>
+      (filters.showFailures || card.kind !== "failed") &&
       (!filters.hostId || card.hostId === filters.hostId) &&
       (!filters.projectKey || card.projectKey === filters.projectKey) &&
       (!filters.unreadOnly || isUnread(card, read)),
