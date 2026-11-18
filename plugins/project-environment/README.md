@@ -28,6 +28,8 @@ You can also paste that Git source into **Settings → Plugins → Plugin source
 
 Git worktrees of the same repository inherit the same project defaults. To override a default, add a variable with the same name under **Workspace variables**. A workspace can also define its own names. Removing a workspace override restores the project default on the next command. Existing saved variables are project defaults.
 
+See the [project defaults](docs/qa/project-defaults-desktop.png) and [workspace override](docs/qa/workspace-override-compact.png) screenshots.
+
 ## Find variables across projects
 
 Open **Environment variables** from the sidebar, or choose **Search environment variables** in the Command Center. Search by name or description to find matching variables across projects and workspaces on the selected host. Values are excluded from the search response and are never used for matching.
@@ -89,6 +91,6 @@ paseo plugin install "$PWD"
 
 The behavior tests include an API request with an injected key, replacing that key through the same MCP connection, and continuing to use the connection after a broker restart. Dependencies use a committed lockfile. The local npm configuration enables legacy peer resolution because npm 10 crashes when resolving the SDK's optional peer graph.
 
-See [browser QA captures](docs/qa/README.md) for the search and inline editor previews and the platform verification limits.
+See [browser QA captures](docs/qa/README.md) for the scope, search, and inline editing checks.
 
 Registry publication requires interface screenshots and a separate registry submission. This repository currently supports installation from Git.
