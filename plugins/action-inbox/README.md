@@ -21,6 +21,7 @@ Enable plugins in Paseo's plugin settings if that daemon has them disabled. Plug
 
 ## Behavior and limits
 
+- Tap a row to open its agent tab on mobile or in a compact window. The envelope button changes read status.
 - The sidebar and inbox share one refresh every 20 seconds while either is mounted. A manual Refresh action is also available. The plugin reads active, non-background agents from online hosts. Offline hosts are named in the screen; their last known state is not shown as current.
 - The inbox reads up to 1,000 active agents per host. A host with more is marked as truncated.
 - **Unread** is local to this device and plugin installation ID. New items start unread. Open an agent, mark an item read or unread, or mark the currently filtered items read together. Viewing the inbox alone does not mark items read. A revised permission or later completion becomes unread again. Read markers survive app reloads and retain the most recent 5,000 items; they contain identifiers and content fingerprints, not request bodies. They do not sync between devices.
