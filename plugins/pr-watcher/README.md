@@ -9,7 +9,7 @@ An opt-in [Paseo](https://paseo.sh) plugin that watches a GitHub PR and sends it
 3. Enable plugins on the target daemon in **Settings → Plugins → Enable plugins**. Plugins are trusted code that can access the daemon machine.
 4. Install with `paseo plugin install git:508-dev/paseo-plugins:plugins/pr-watcher`. The daemon needs Node and npm on its command path; the manifest installs the locked SDK and validation dependencies with lifecycle scripts disabled.
 5. Open **Watch PR** in the workspace header, or the pill above an agent's composer. On compact layouts, the header action is in the workspace's **···** menu.
-6. Select the detected PR and the agent that should receive follow-ups, then choose **Watch PR**. The agent-tab pill preselects that agent; the workspace header defaults to the focused agent in that workspace, or its only agent. When neither applies, choose a recipient. If several PRs match, pick one. If none matches, enter a GitHub PR URL.
+6. Confirm the pull request and recipient, then choose **Watch PR**. If several PRs match, pick one. Use **Enter URL** to watch a different PR. The URL field opens automatically if discovery finds no match. The agent-tab pill preselects that agent, and the workspace header defaults to the focused agent in that workspace or its only agent. Use **Change agent** to pick a different recipient when several agents are available.
 7. The control changes to **Watching #123**. Open it to see the recipient, last check, follow-up count, errors, and **Stop watching**. Paused or uncertain watches have their own labels and recovery actions. **Watched pull requests** in Command Center still lists every watch on this host.
 
 The `/watch-pr https://github.com/owner/repo/pull/123` and `/watch-pr owner/repo#123` shortcuts remain available in agent chat.
@@ -20,8 +20,8 @@ The plugin does not merge PRs. It sends the agent a request to inspect and addre
 
 The actual popover rendered in Chromium with sample host data. These previews verify desktop dark and compact light layouts; they are not captures of the full Paseo app or physical mobile devices.
 
-<img src="docs/screenshots/workspace-watch-desktop.png" alt="An existing watch with its recipient, last check, and Stop watching action" width="380" />
-<img src="docs/screenshots/workspace-watch-compact.png" alt="Compact light layout with a detected pull request and agent selection" width="390" />
+<img src="docs/screenshots/workspace-watch-desktop.png" alt="Desktop setup with one detected pull request, a preselected agent, and a visible Watch PR button" width="370" />
+<img src="docs/screenshots/workspace-watch-compact.png" alt="Compact light setup with two detected pull requests and a selected recipient" width="374" />
 
 ## PR detection
 
