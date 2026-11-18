@@ -31,6 +31,11 @@ Enable plugins in Paseo's plugin settings if that daemon has them disabled. Plug
 - **Ready to review** means Paseo marked a finished agent as needing attention. It does not mean a pull request or CI check is ready to merge.
 - Marking an item read does not clear workspace attention or answer a request. The plugin does not resume failed runs or queue actions for offline hosts. Its unread count is an inbox indicator, not an OS push notification badge.
 
+## Show failures screenshots
+
+- [Desktop with failures hidden and two unread failures counted](docs/screenshots/failures-hidden.png)
+- [Compact view with failures shown](docs/screenshots/failures-shown-compact.png)
+
 ## Development
 
 ```sh
