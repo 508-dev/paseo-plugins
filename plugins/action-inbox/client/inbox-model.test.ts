@@ -1,5 +1,6 @@
 import type { PaseoAgent, PaseoAgentHandle } from "@getpaseo/client";
 import { describe, expect, it, vi } from "vitest";
+import { inboxPreferences } from "../shared/preferences";
 import {
   cardsForAgent,
   directActions,
@@ -180,6 +181,18 @@ describe("direct permission actions", () => {
 });
 
 describe("inbox read state and filters", () => {
+  it("defaults to hiding failures for existing preferences and preserves read markers", () => {
+    const readTokens = { "existing-card": "existing-token" };
+    expect(inboxPreferences.schema.parse({ readTokens })).toEqual({
+      readTokens,
+      showFailures: false,
+    });
+    expect(inboxPreferences.schema.parse({ readTokens, showFailures: true })).toEqual({
+      readTokens,
+      showFailures: true,
+    });
+  });
+
   it("keeps an approval read across refreshes and saved-state reloads, but marks changed content unread", () => {
     const original = cardsForAgent(agent({ pendingPermissions: [permission()] }), location)[0];
     expect(isUnread(original, {})).toBe(true);
@@ -217,12 +230,37 @@ describe("inbox read state and filters", () => {
     const a = cardsForAgent(agent({ status: "error" }), location)[0];
     const b = cardsForAgent(agent({ status: "error" }), { ...location, hostId: "host-b" })[0];
     expect(a.projectKey).not.toBe(b.projectKey);
-    const filters = { hostId: "host-a", projectKey: a.projectKey, unreadOnly: true };
+    const filters = {
+      hostId: "host-a",
+      projectKey: a.projectKey,
+      unreadOnly: true,
+      showFailures: true,
+    };
     const visible = filterCards([a, b], filters, {});
     expect(visible).toEqual([a]);
     const saved = markRead({}, visible);
     expect(isUnread(a, saved)).toBe(false);
     expect(isUnread(b, saved)).toBe(true);
+  });
+
+  it("keeps hidden failures unread when marking the inbox read", () => {
+    const review = cardsForAgent(
+      agent({ requiresAttention: true, attentionReason: "finished" }),
+      location,
+    )[0];
+    const unreadFailure = cardsForAgent(agent({ status: "error" }), location)[0];
+    const readFailure = cardsForAgent(agent({ id: "agent-b", status: "error" }), location)[0];
+    const cards = [review, unreadFailure, readFailure];
+    const read = markRead({}, [readFailure]);
+    const visible = filterCards(cards, {}, read);
+    expect(visible).toEqual([review]);
+
+    const afterBulkRead = markRead(read, visible);
+    expect(filterCards(cards, { unreadOnly: true }, afterBulkRead)).toEqual([]);
+    expect(filterCards(cards, { showFailures: true }, afterBulkRead)).toEqual(cards);
+    expect(filterCards(cards, { showFailures: true, unreadOnly: true }, afterBulkRead)).toEqual([
+      unreadFailure,
+    ]);
   });
 
   it("reads question text and choices without leaking metadata into the preview", () => {
