@@ -23,6 +23,9 @@ export interface ProjectScope {
   cwd: string;
 }
 
+type StorageKey = { id: string; projectScopeId?: string };
+type StorageScope = StorageKey & ProjectScope;
+
 export async function projectScope(directory: string): Promise<ProjectScope> {
   const cwd = await realpath(directory);
   let identity = cwd;
@@ -43,6 +46,24 @@ export async function projectScope(directory: string): Promise<ProjectScope> {
       throw new Error("Cannot resolve project environment scope", { cause: error });
   }
   return { id: createHash("sha256").update(identity).digest("hex"), cwd };
+}
+
+export async function workspaceScope(project: ProjectScope): Promise<StorageScope> {
+  let cwd = project.cwd;
+  // Paseo groups directories within a Git checkout into a single workspace.
+  // Resolve from the saved command directory so existing agent URLs inherit overrides.
+  if (createHash("sha256").update(cwd).digest("hex") !== project.id) {
+    const result = await execFileAsync("git", ["rev-parse", "--show-toplevel"], {
+      cwd,
+      timeout: 5000,
+    });
+    cwd = await realpath(result.stdout.replace(/\r?\n$/, ""));
+  }
+  return {
+    id: createHash("sha256").update(cwd).digest("hex"),
+    projectScopeId: project.id,
+    cwd,
+  };
 }
 
 export async function privateDirectory(directory: string): Promise<void> {
@@ -76,15 +97,39 @@ export class EnvironmentStore {
   private writes = Promise.resolve();
   constructor(private directory: string) {}
 
-  async read(scope: Pick<ProjectScope, "id">): Promise<Variable[]> {
-    const data = await readJson(path.join(this.directory, `${scope.id}.json`));
+  private file(scope: StorageKey): string {
+    return scope.projectScopeId
+      ? path.join(this.directory, "workspaces", scope.projectScopeId, `${scope.id}.json`)
+      : path.join(this.directory, `${scope.id}.json`);
+  }
+
+  async read(scope: StorageKey): Promise<Variable[]> {
+    const data = await readJson(this.file(scope));
     if (data === null) return [];
     const result = documentSchema.safeParse(data);
     if (!result.success) throw new Error("Project environment storage is invalid");
     return result.data.variables;
   }
 
-  async readValue(scope: Pick<ProjectScope, "id">, name: string): Promise<string> {
+  async readWorkspace(project: ProjectScope) {
+    const scope = await workspaceScope(project);
+    return this.read(scope);
+  }
+
+  async readEffective(project: ProjectScope) {
+    const [defaults, overrides] = await Promise.all([
+      this.read(project),
+      this.readWorkspace(project),
+    ]);
+    const values = new Map(defaults.map((variable) => [variable.name, variable]));
+    for (const variable of overrides) values.set(variable.name, variable);
+    return {
+      variables: [...values.values()].toSorted((a, b) => a.name.localeCompare(b.name)),
+      secrets: [...defaults, ...overrides].map(({ value }) => value),
+    };
+  }
+
+  async readValue(scope: StorageKey, name: string): Promise<string> {
     const variable = (await this.read(scope)).find((entry) => entry.name === name);
     if (!variable) throw new Error("The saved variable is no longer available");
     return variable.value;
@@ -116,27 +161,27 @@ export class EnvironmentStore {
     return entries;
   }
 
-  async save(scope: ProjectScope, variable: Variable): Promise<void> {
+  async save(scope: StorageScope, variable: Variable): Promise<void> {
     const parsed = variableInput.safeParse(variable);
     if (!parsed.success) throw new Error("Invalid environment variable");
     return this.change(scope, (variables) => {
       const next = variables.filter((entry) => entry.name !== variable.name);
-      if (next.length >= 256) throw new Error("A project can have at most 256 variables");
+      if (next.length >= 256) throw new Error("A scope can have at most 256 variables");
       return [...next, parsed.data].toSorted((a, b) => a.name.localeCompare(b.name));
     });
   }
 
-  async remove(scope: ProjectScope, name: string): Promise<void> {
+  async remove(scope: StorageScope, name: string): Promise<void> {
     return this.change(scope, (variables) => variables.filter((entry) => entry.name !== name));
   }
 
   private change(
-    scope: ProjectScope,
+    scope: StorageScope,
     update: (variables: Variable[]) => Variable[],
   ): Promise<void> {
     const write = this.writes.then(async () => {
       const variables = update(await this.read(scope));
-      return privateWrite(path.join(this.directory, `${scope.id}.json`), {
+      return privateWrite(this.file(scope), {
         directory: scope.cwd,
         variables,
       });

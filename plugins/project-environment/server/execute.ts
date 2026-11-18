@@ -49,7 +49,7 @@ export function redact(text: string, secrets: string[]): string {
 export async function execute(options: ExecutionOptions): Promise<ExecutionResult> {
   const input = executionInput.parse(options.input);
   if (options.signal?.aborted) throw new Error("Environment command canceled");
-  const variables = await options.store.read(options.scope);
+  const { variables, secrets } = await options.store.readEffective(options.scope);
   const env: NodeJS.ProcessEnv = {};
   for (const name of BASE_ENVIRONMENT) {
     if (process.env[name] !== undefined) env[name] = process.env[name];
@@ -60,8 +60,6 @@ export async function execute(options: ExecutionOptions): Promise<ExecutionResul
       throw new Error(`Variable ${name} is unavailable. List available variables first.`);
     env[name] = variable.value;
   }
-  // Redact all project values, including a value read by the command from a local file.
-  const secrets = variables.map((entry) => entry.value);
   return new Promise((resolve, reject) => {
     const child = spawn("sh", ["-c", input.command], {
       cwd: options.scope.cwd,

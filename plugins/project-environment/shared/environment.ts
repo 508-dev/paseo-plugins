@@ -13,24 +13,31 @@ export const variableInput = variableMetadata.extend({
     .max(16384)
     .refine((value) => !value.includes("\0"), "Values cannot contain a null character"),
 });
-const workspace = z.object({ workspaceId: z.string().min(1) });
+const workspaceInput = z.object({ workspaceId: z.string().min(1) });
+const editScope = workspaceInput.extend({
+  scope: z.enum(["project", "workspace"]).default("project"),
+});
+export const scopeId = z.string().regex(/^[a-f0-9]{64}$/);
 export const listVariables = defineRpc({
   name: "environment.list",
-  input: workspace,
-  output: z.object({ variables: z.array(variableMetadata) }),
+  input: workspaceInput,
+  output: z.object({
+    scopeId,
+    variables: z.array(variableMetadata),
+    workspaceVariables: z.array(variableMetadata),
+  }),
 });
 export const saveVariable = defineRpc({
   name: "environment.save",
-  input: workspace.extend({ variable: variableInput }),
+  input: editScope.extend({ variable: variableInput }),
   output: z.object({}),
 });
 export const removeVariable = defineRpc({
   name: "environment.remove",
-  input: workspace.extend({ name: variableName }),
+  input: editScope.extend({ name: variableName }),
   output: z.object({}),
 });
 
-export const scopeId = z.string().regex(/^[a-f0-9]{64}$/);
 export const variableTarget = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("workspace"), workspaceId: z.string().min(1) }),
   z.object({ kind: z.literal("project"), scopeId }),
@@ -48,7 +55,14 @@ export const catalogueProject = z
     name: z.string(),
     directory: z.string().nullable(),
     workspaces: z.array(
-      z.object({ id: z.string(), name: z.string(), directory: z.string() }).strict(),
+      z
+        .object({
+          id: z.string(),
+          name: z.string(),
+          directory: z.string(),
+          variables: z.array(variableMetadata.strict()),
+        })
+        .strict(),
     ),
     variables: z.array(variableMetadata.strict()),
   })
@@ -70,11 +84,18 @@ export function filterVariableCatalogue(
   query: string,
 ): CatalogueProject[] {
   const terms = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+  function matches({ name, description }: z.infer<typeof variableMetadata>) {
+    const text = `${name}\n${description}`.toLocaleLowerCase();
+    return terms.every((term) => text.includes(term));
+  }
   return projects.flatMap((project) => {
-    const variables = project.variables.filter(({ name, description }) => {
-      const text = `${name}\n${description}`.toLocaleLowerCase();
-      return terms.every((term) => text.includes(term));
+    const variables = project.variables.filter(matches);
+    const workspaces = project.workspaces.flatMap((workspace) => {
+      const localVariables = workspace.variables.filter(matches);
+      return variables.length || localVariables.length
+        ? [{ ...workspace, variables: localVariables }]
+        : [];
     });
-    return variables.length ? [{ ...project, variables }] : [];
+    return variables.length || workspaces.length ? [{ ...project, variables, workspaces }] : [];
   });
 }

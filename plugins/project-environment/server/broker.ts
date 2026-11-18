@@ -73,13 +73,13 @@ export class EnvironmentBroker {
         "project_environment_list",
         {
           description:
-            "List available project environment variable names and descriptions. Never returns values. " +
+            "List available environment variable names and descriptions for this workspace. Never returns values. " +
             toolInstructions,
           inputSchema: z.object({}).strict(),
           annotations: { readOnlyHint: true, openWorldHint: false },
         },
         async () => {
-          const variables = await this.store.read(binding.scope);
+          const { variables } = await this.store.readEffective(binding.scope);
           const metadata = variables.map(({ name, description }) => ({ name, description }));
           return { content: [{ type: "text", text: JSON.stringify({ variables: metadata }) }] };
         },
@@ -88,7 +88,7 @@ export class EnvironmentBroker {
         "project_environment_run",
         {
           description:
-            "Run a shell command in this workspace with named project variables injected from current storage. Use for API calls and SDK scripts requiring credentials. " +
+            "Run a shell command in this workspace with named environment variables injected from current storage. Use for API calls and SDK scripts requiring credentials. " +
             toolInstructions,
           inputSchema: executionInput,
           annotations: {

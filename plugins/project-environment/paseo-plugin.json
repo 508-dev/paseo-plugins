@@ -7,8 +7,8 @@
   },
   "build": [["npm", "ci", "--omit=dev", "--ignore-scripts", "--no-audit", "--no-fund"]],
   "media": [
-    "docs/qa/replacement-desktop.png",
-    "docs/qa/replacement-mobile.png",
-    "docs/qa/search-desktop.png"
+    "docs/qa/project-defaults-desktop.png",
+    "docs/qa/workspace-override-compact.png",
+    "docs/qa/scoped-search-desktop.png"
   ]
 }

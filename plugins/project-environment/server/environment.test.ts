@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { createServer } from "node:http";
-import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -9,7 +9,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { z } from "zod";
 import { EnvironmentBroker } from "./broker";
-import { EnvironmentStore, projectScope } from "./store";
+import { EnvironmentStore, projectScope, workspaceScope } from "./store";
 import { execute, redact } from "./execute";
 import { buildVariableCatalogue } from "./catalogue";
 import {
@@ -71,7 +71,7 @@ test("persists variables privately, serializes edits, and scopes them by project
   expect((await store.read(scope)).map((variable) => variable.name)).toEqual(["SECOND_KEY"]);
 });
 
-test("Git worktrees share variables while retaining their own command directory", async () => {
+test("Git worktrees inherit project defaults and can override them independently", async () => {
   const { directory, store } = await fixture();
   await execFileAsync("git", ["init", "--initial-branch=main", directory]);
   await execFileAsync("git", [
@@ -99,7 +99,33 @@ test("Git worktrees share variables while retaining their own command directory"
     input: { command: "pwd", variables: ["API_KEY"] },
   });
   expect(result.output.trim()).toBe(worktree);
-  const catalogue = await buildVariableCatalogue({
+  const nested = path.join(worktree, "nested");
+  await mkdir(nested);
+  const nestedScope = await projectScope(nested);
+  const localScope = await workspaceScope(worktreeScope);
+  expect(await workspaceScope(nestedScope)).toEqual(localScope);
+  expect(await workspaceScope(mainScope)).not.toEqual(localScope);
+  await store.save(localScope, {
+    name: "LOCAL_KEY",
+    description: "Only in the worktree",
+    value: "worktree-only-test-value",
+  });
+  await store.save(localScope, {
+    name: "API_KEY",
+    description: "Worktree override",
+    value: "worktree-key-test-value",
+  });
+  const main = await store.readEffective(mainScope);
+  expect(main.variables.map(({ name, value }) => [name, value])).toEqual([
+    ["API_KEY", "shared-value"],
+  ]);
+  const local = await store.readEffective(nestedScope);
+  expect(local.variables.map(({ name, value }) => [name, value])).toEqual([
+    ["API_KEY", "worktree-key-test-value"],
+    ["LOCAL_KEY", "worktree-only-test-value"],
+  ]);
+  expect(local.secrets).toContain("shared-value");
+  const catalogueOptions: Parameters<typeof buildVariableCatalogue>[0] = {
     store,
     projects: [
       { projectId: "git-project", projectDisplayName: "Git project", projectRootPath: directory },
@@ -123,13 +149,26 @@ test("Git worktrees share variables while retaining their own command directory"
       },
     ],
     bindings: [],
-  });
+  };
+  const catalogue = await buildVariableCatalogue(catalogueOptions);
   expect(catalogue.projects).toHaveLength(1);
   expect(catalogue.projects[0].variables).toHaveLength(1);
   expect(catalogue.projects[0].workspaces.map((workspace) => workspace.id)).toEqual([
     "main",
     "worktree",
   ]);
+  const [matched] = filterVariableCatalogue(catalogue.projects, "worktree override");
+  expect(matched.variables).toEqual([]);
+  expect(matched.workspaces.map(({ id, variables }) => ({ id, variables }))).toEqual([
+    { id: "worktree", variables: [{ name: "API_KEY", description: "Worktree override" }] },
+  ]);
+  expect(variableCatalogue.output.safeParse(catalogue).success).toBe(true);
+  expect(JSON.stringify(catalogue)).not.toContain("worktree-key-test-value");
+  await store.remove(mainScope, "API_KEY");
+  const workspaceOnly = await buildVariableCatalogue(catalogueOptions);
+  expect(workspaceOnly.projects).toHaveLength(1);
+  expect(workspaceOnly.projects[0].variables).toEqual([]);
+  expect(filterVariableCatalogue(workspaceOnly.projects, "LOCAL_KEY")).toHaveLength(1);
 });
 
 test("injects only requested variables, redacts both streams across chunks, and preserves exit codes", async () => {
@@ -262,7 +301,6 @@ test("the same MCP client uses an updated API key without reopening its agent", 
       }),
     ),
   ).toContain("customer-1");
-  expect(received).toEqual(["Bearer first-private-key", "Bearer updated-private-key"]);
   await broker.close();
   const restarted = new EnvironmentBroker(path.join(directory, "broker"));
   await restarted.start();
@@ -273,6 +311,26 @@ test("the same MCP client uses an updated API key without reopening its agent", 
   );
   expect(afterReload).toContain("Customer API");
   expect(afterReload).not.toContain("updated-private-key");
+  const localScope = await workspaceScope(scope);
+  await restarted.store.save(localScope, {
+    name: "API_KEY",
+    description: "Workspace API",
+    value: "workspace-private-key",
+  });
+  const overridden = toolText(
+    await client.callTool({ name: "project_environment_list", arguments: {} }),
+  );
+  expect(overridden).toBe('{"variables":[{"name":"API_KEY","description":"Workspace API"}]}');
+  const run = { name: "project_environment_run", arguments: { command, variables: ["API_KEY"] } };
+  expect(toolText(await client.callTool(run))).toContain("customer-1");
+  await restarted.store.remove(localScope, "API_KEY");
+  expect(toolText(await client.callTool(run))).toContain("customer-1");
+  expect(received).toEqual([
+    "Bearer first-private-key",
+    "Bearer updated-private-key",
+    "Bearer workspace-private-key",
+    "Bearer updated-private-key",
+  ]);
   expect(await readFile(path.join(directory, "broker", "broker.json"), "utf8")).not.toContain(
     "private-key",
   );
