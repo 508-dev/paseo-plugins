@@ -15,6 +15,7 @@ import {
 } from "./inbox-model";
 import { createInboxStore } from "./inbox-store";
 import { createProgressStore, latestProgress } from "./inbox-progress";
+import { createApprovalStore } from "./inbox-approvals";
 
 const location = {
   hostId: "host-a",
@@ -52,6 +53,24 @@ describe("latest progress previews", () => {
     expect(latestProgress([older, assistant("Current work is blocked.", "new")], "new")).toBe(
       "Current work is blocked.",
     );
+  });
+
+  it("joins wrapped sentences while keeping separate paragraphs, headings, and code blocks apart", () => {
+    expect(
+      latestProgress([
+        assistant(
+          "The migration is complete\nexcept for the production database.\n\nFollow-up is scheduled.",
+        ),
+      ]),
+    ).toBe("The migration is complete except for the production database.");
+    expect(
+      latestProgress([assistant("Release notes\n-------------\n**Summary**\nTests passed.")]),
+    ).toBe("Tests passed.");
+    for (const separator of ["\n\n", "\n## Details\n", "\n```ts\nsecretCode()\n```\n"]) {
+      expect(latestProgress([assistant(`A separate paragraph${separator}starts here.`)])).toBe(
+        "A separate paragraph",
+      );
+    }
   });
 
   it("skips code and caps the excerpt at 120 characters without splitting emoji", () => {
@@ -93,6 +112,66 @@ describe("latest progress previews", () => {
     expect(retained).toHaveBeenCalledOnce();
     expect(load).toHaveBeenCalledTimes(4);
     resolves.slice(1).forEach((resolve) => resolve(null));
+  });
+
+  it("retries failed reads on refresh without reloading a successful empty preview", async () => {
+    const store = createProgressStore();
+    const failed = vi
+      .fn<() => Promise<string | null>>()
+      .mockRejectedValueOnce(new Error("connection lost"))
+      .mockResolvedValueOnce("Recovered preview.");
+    const empty = vi.fn(async () => null);
+    store.subscribe("failed", failed, () => {});
+    store.subscribe("empty", empty, () => {});
+    await Promise.resolve();
+    expect(store.get("failed")).toBeNull();
+    expect(failed).toHaveBeenCalledOnce();
+    store.retryFailed();
+    store.retryFailed();
+    await Promise.resolve();
+    expect(store.get("failed")).toBe("Recovered preview.");
+    expect(failed).toHaveBeenCalledTimes(2);
+    expect(empty).toHaveBeenCalledOnce();
+  });
+
+  it("retries a failed revision when a row returns", async () => {
+    const store = createProgressStore();
+    const load = vi
+      .fn<() => Promise<string | null>>()
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce("Recovered preview.");
+    const unsubscribe = store.subscribe("revision", load, () => {});
+    await Promise.resolve();
+    unsubscribe();
+    store.retryFailed();
+    expect(load).toHaveBeenCalledOnce();
+    store.subscribe("revision", load, () => {});
+    await Promise.resolve();
+    expect(store.get("revision")).toBe("Recovered preview.");
+  });
+});
+
+describe("approval state across row remounts", () => {
+  it("blocks duplicate submissions and retains a failure for a replacement row", async () => {
+    const store = createApprovalStore();
+    let reject!: (error: Error) => void;
+    const respond = vi.fn(
+      () =>
+        new Promise<void>((_, fail) => {
+          reject = fail;
+        }),
+    );
+    const operation = store.run("card-a", "accept", respond);
+    store.prune(new Set());
+    expect(store.getSnapshot().get("card-a")?.pending).toBe("accept");
+    await store.run("card-a", "reject", respond);
+    expect(respond).toHaveBeenCalledOnce();
+    reject(new Error("Request changed"));
+    await operation;
+    store.prune(new Set(["card-a"]));
+    expect(store.getSnapshot().get("card-a")).toEqual({ pending: null, error: "Request changed" });
+    await store.run("card-a", "accept", async () => {});
+    expect(store.getSnapshot().has("card-a")).toBe(false);
   });
 });
 

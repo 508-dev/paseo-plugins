@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { FlatList, Switch, Text, View } from "react-native";
 import { getPaseoClient, useSettings, type PluginScreenProps } from "@getpaseo/plugin/client";
 import { inboxPreferences } from "../shared/preferences";
-import { filterCards, isUnread, markRead, type InboxCard } from "./inbox-model";
+import { filterCards, isUnread, markRead, respondToCard, type InboxCard } from "./inbox-model";
+import { createApprovalStore } from "./inbox-approvals";
 import { InboxButton, InboxFilter } from "./inbox-controls";
 import { InboxRow } from "./inbox-row";
 import { useInbox } from "./use-inbox";
@@ -13,6 +14,15 @@ export function InboxScreen({ theme, layout, navigation }: PluginScreenProps) {
   const [hostId, setHostId] = useState<string | null>(null);
   const [projectKey, setProjectKey] = useState<string | null>(null);
   const [unreadOnly, setUnreadOnly] = useState(false);
+  const [approvalStore] = useState(createApprovalStore);
+  const approvals = useSyncExternalStore(
+    approvalStore.subscribe,
+    approvalStore.getSnapshot,
+    approvalStore.getSnapshot,
+  );
+  useEffect(() => {
+    if (approvals.size > 0) approvalStore.prune(new Set(inbox.cards.map(({ key }) => key)));
+  }, [approvalStore, approvals, inbox.cards]);
   const readReady = preferences.status === "ready";
   const read = readReady ? preferences.values.readTokens : {};
   const showFailures = readReady && preferences.values.showFailures;
@@ -87,8 +97,18 @@ export function InboxScreen({ theme, layout, navigation }: PluginScreenProps) {
                 }
               : undefined
           }
-          getAgent={() => getPaseoClient(card.hostId).agents.ref(card.agentId)}
-          onRefresh={inbox.refresh}
+          approval={approvals.get(card.key)}
+          onRespond={(action) =>
+            void approvalStore.run(card.key, action.id, async () => {
+              try {
+                await respondToCard(card, action, () =>
+                  getPaseoClient(card.hostId).agents.ref(card.agentId),
+                );
+              } finally {
+                await inbox.refresh();
+              }
+            })
+          }
         />
       )}
       ListHeaderComponent={

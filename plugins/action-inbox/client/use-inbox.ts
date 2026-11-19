@@ -44,7 +44,8 @@ export function useInboxProgress({ hostId, agentId, agentUpdatedAt, activeTurnId
             projection: "projected",
             limit: 24,
           });
-          return page.error ? null : latestProgress(page.entries, activeTurnId);
+          if (page.error) throw new Error(page.error);
+          return latestProgress(page.entries, activeTurnId);
         },
         listener,
       ),
@@ -64,6 +65,9 @@ export function useInbox() {
       hosts.some((host) => host.serverId === card.hostId && host.status === "online"),
     ),
     hosts,
-    refresh: () => store.refresh(true),
+    refresh: () => {
+      progressStore.retryFailed();
+      return store.refresh(true);
+    },
   };
 }

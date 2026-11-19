@@ -5,17 +5,41 @@ type TimelineEntry = Pick<TimelinePage["entries"][number], "item" | "turnId">;
 
 const excerptLimit = 120;
 
-function openingSentence(message: string): string | null {
-  let inCodeBlock = false;
+function* proseBlocks(message: string) {
+  let fence = "";
+  let block: string[] = [];
+  const listItem = /^(?:[-*+]\s+|\d+[.)]\s+)/;
   for (const line of message.split("\n")) {
     const trimmed = line.trim();
-    if (/^(?:`{3,}|~{3,})/.test(trimmed)) {
-      inCodeBlock = !inCodeBlock;
+    const marker = trimmed.match(/^(?:`{3,}|~{3,})/)?.[0];
+    if (!fence && /^(?:=+|-+)$/.test(trimmed)) {
+      // A setext underline turns the preceding paragraph into a heading.
+      block = [];
       continue;
     }
-    if (inCodeBlock || /^(?:#{1,6}\s|>)/.test(trimmed)) continue;
-    const plain = trimmed
-      .replace(/^(?:[-*+]\s+|\d+[.)]\s+)/, "")
+    const heading =
+      /^(?:#{1,6}\s|>)/.test(trimmed) ||
+      /^(?:summary|update|progress|results?)[:.!]*$/i.test(trimmed.replace(/\*\*|__/g, ""));
+    const boundary = !trimmed || marker || heading;
+    if (boundary || listItem.test(trimmed)) {
+      if (block.length) yield block.join(" ");
+      block = [];
+    }
+    if (marker) {
+      if (!fence) fence = marker;
+      else if (marker[0] === fence[0] && marker.length >= fence.length && trimmed === marker) {
+        fence = "";
+      }
+    } else if (!fence && !boundary) {
+      block.push(trimmed.replace(listItem, ""));
+    }
+  }
+  if (block.length) yield block.join(" ");
+}
+
+function openingSentence(message: string): string | null {
+  for (const block of proseBlocks(message)) {
+    const plain = block
       .replace(/!\[[^\]]*\]\([^)]+\)/g, "")
       .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
       .replace(/\*\*|__|`/g, "")
@@ -60,7 +84,7 @@ export function latestProgress(
 type ProgressEntry = {
   listeners: Set<() => void>;
   load: () => Promise<string | null>;
-  status: "queued" | "loading" | "ready";
+  status: "queued" | "loading" | "ready" | "failed";
   excerpt: string | null;
 };
 
@@ -76,16 +100,17 @@ export function createProgressStore() {
     }
   }
 
-  async function fetchEntry(entry: ProgressEntry) {
+  async function fetchEntry(key: string, entry: ProgressEntry) {
     entry.status = "loading";
     inFlight += 1;
     try {
       entry.excerpt = await entry.load();
+      entry.status = "ready";
     } catch {
-      entry.excerpt = null;
+      entry.status = "failed";
+      if (entry.listeners.size === 0) entries.delete(key);
     } finally {
       inFlight -= 1;
-      entry.status = "ready";
       for (const listener of entry.listeners) listener();
       prune();
       pump();
@@ -93,14 +118,20 @@ export function createProgressStore() {
   }
 
   function pump() {
-    for (const entry of entries.values()) {
+    for (const [key, entry] of entries) {
       if (inFlight >= 4) break;
-      if (entry.status === "queued") void fetchEntry(entry);
+      if (entry.status === "queued") void fetchEntry(key, entry);
     }
   }
 
   return {
     get: (key: string) => entries.get(key)?.excerpt ?? null,
+    retryFailed() {
+      for (const entry of entries.values()) {
+        if (entry.status === "failed") entry.status = "queued";
+      }
+      pump();
+    },
     subscribe(key: string, load: ProgressEntry["load"], listener: () => void) {
       let entry = entries.get(key);
       if (!entry) {
@@ -109,10 +140,15 @@ export function createProgressStore() {
       }
       const subscribed = entry;
       subscribed.listeners.add(listener);
+      if (subscribed.status === "failed") subscribed.status = "queued";
       pump();
       return () => {
         subscribed.listeners.delete(listener);
-        if (subscribed.status === "queued" && subscribed.listeners.size === 0) entries.delete(key);
+        if (
+          (subscribed.status === "queued" || subscribed.status === "failed") &&
+          subscribed.listeners.size === 0
+        )
+          entries.delete(key);
         prune();
       };
     },
