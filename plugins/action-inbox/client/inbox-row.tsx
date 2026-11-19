@@ -2,18 +2,18 @@ import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { Icon } from "@getpaseo/plugin/client/ui";
 import type { PluginTheme } from "@getpaseo/plugin";
-import type { PaseoAgentHandle } from "@getpaseo/client";
 import {
   directActions,
   permissionDetails,
   permissionSummary,
   questionPreview,
-  respondToCard,
   type InboxCard,
   type InboxKind,
   type PermissionAction,
 } from "./inbox-model";
 import { InboxButton } from "./inbox-controls";
+import type { ApprovalState } from "./inbox-approvals";
+import { useInboxProgress } from "./use-inbox";
 
 const kinds: Record<InboxKind, { label: string; icon: string; action: string }> = {
   question: { label: "Question", icon: "MessageCircle", action: "Answer question" },
@@ -44,8 +44,8 @@ export function InboxRow({
   readDisabled,
   onToggleRead,
   onOpen,
-  getAgent,
-  onRefresh,
+  approval,
+  onRespond,
 }: {
   card: InboxCard;
   theme: PluginTheme;
@@ -55,12 +55,13 @@ export function InboxRow({
   readDisabled: boolean;
   onToggleRead(): void;
   onOpen?: () => void;
-  getAgent(): Pick<PaseoAgentHandle, "refresh" | "respondToPermission">;
-  onRefresh(): Promise<void>;
+  approval?: ApprovalState;
+  onRespond(action: PermissionAction): void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const [pending, setPending] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const pending = approval?.pending ?? null;
+  const error = approval?.error;
+  const progress = useInboxProgress(card);
   const kind = kinds[card.kind];
   const questions =
     card.permission && card.kind === "question" ? questionPreview(card.permission) : [];
@@ -69,21 +70,6 @@ export function InboxRow({
   const openRow = tapToOpen ? onOpen : undefined;
   const foreground = { color: theme.colors.foreground, fontSize: 14, lineHeight: 20 };
   const muted = { color: theme.colors.foregroundMuted, fontSize: 12, lineHeight: 18 };
-
-  async function respond(action: PermissionAction) {
-    if (pending) return;
-    setPending(action.id);
-    setError(null);
-    try {
-      await respondToCard(card, action, getAgent);
-      await onRefresh();
-    } catch (failure) {
-      setError(failure instanceof Error ? failure.message : String(failure));
-      void onRefresh();
-    } finally {
-      setPending(null);
-    }
-  }
 
   const content = (
     <>
@@ -145,6 +131,25 @@ export function InboxRow({
       ) : null}
       {card.kind === "attention" ? (
         <Text style={foreground}>The agent is waiting for your input</Text>
+      ) : null}
+      {progress ? (
+        <View
+          style={{
+            marginTop: 2,
+            paddingLeft: 8,
+            borderLeftWidth: 2,
+            borderLeftColor: theme.colors.foregroundMuted,
+          }}
+        >
+          <Text
+            numberOfLines={2}
+            style={{ color: theme.colors.foreground, fontSize: 13, lineHeight: 19 }}
+          >
+            <Text style={{ fontWeight: "600" }}>Latest update</Text>
+            {"  "}
+            {progress}
+          </Text>
+        </View>
       ) : null}
     </>
   );
@@ -257,7 +262,7 @@ export function InboxRow({
                     variant={action.behavior === "allow" ? "solid" : "outline"}
                     danger={action.behavior === "deny"}
                     icon={action.behavior === "allow" ? "Check" : "X"}
-                    onPress={() => void respond(action)}
+                    onPress={() => onRespond(action)}
                   >
                     {pending === action.id ? "Sending..." : action.label}
                   </InboxButton>
