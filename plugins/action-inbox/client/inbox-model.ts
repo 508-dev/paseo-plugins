@@ -14,6 +14,8 @@ export interface InboxCard {
   agentTitle: string;
   kind: InboxKind;
   updatedAt: string;
+  agentUpdatedAt: string;
+  activeTurnId: string | undefined;
   error: string | null;
   permission: Permission | null;
 }
@@ -39,6 +41,8 @@ export function cardsForAgent(
     projectKey: JSON.stringify([location.hostId, location.projectKey]),
     agentTitle: agent.title || agent.provider,
     updatedAt: agent.attentionTimestamp ?? agent.updatedAt,
+    agentUpdatedAt: agent.updatedAt,
+    activeTurnId: agent.activeTurn?.turnId,
     error: agent.lastError ?? null,
   };
   if (agent.pendingPermissions.length > 0) {

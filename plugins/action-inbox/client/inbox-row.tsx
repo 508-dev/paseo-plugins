@@ -14,6 +14,7 @@ import {
   type PermissionAction,
 } from "./inbox-model";
 import { InboxButton } from "./inbox-controls";
+import { useInboxProgress } from "./use-inbox";
 
 const kinds: Record<InboxKind, { label: string; icon: string; action: string }> = {
   question: { label: "Question", icon: "MessageCircle", action: "Answer question" },
@@ -61,6 +62,7 @@ export function InboxRow({
   const [expanded, setExpanded] = useState(false);
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const progress = useInboxProgress(card);
   const kind = kinds[card.kind];
   const questions =
     card.permission && card.kind === "question" ? questionPreview(card.permission) : [];
@@ -145,6 +147,11 @@ export function InboxRow({
       ) : null}
       {card.kind === "attention" ? (
         <Text style={foreground}>The agent is waiting for your input</Text>
+      ) : null}
+      {progress ? (
+        <Text numberOfLines={2} style={muted}>
+          Latest update · {progress}
+        </Text>
       ) : null}
     </>
   );

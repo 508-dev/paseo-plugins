@@ -14,6 +14,7 @@ import {
   type Permission,
 } from "./inbox-model";
 import { createInboxStore } from "./inbox-store";
+import { createProgressStore, latestProgress } from "./inbox-progress";
 
 const location = {
   hostId: "host-a",
@@ -21,6 +22,79 @@ const location = {
   projectName: "Paseo",
   projectKey: "paseo",
 };
+
+describe("latest progress previews", () => {
+  const assistant = (text: string, turnId?: string) => ({
+    turnId,
+    item: { type: "assistant_message" as const, text },
+  });
+  const prompt = { item: { type: "user_message" as const, text: "Try again" } };
+
+  it("takes the first substantive sentence of the newest useful message", () => {
+    expect(
+      latestProgress([
+        prompt,
+        assistant("I started the migration.", "new"),
+        assistant(
+          "## Update\nDone. **Migrated** [workspaces](https://example.com). Next, add tests.",
+          "new",
+        ),
+        assistant("Sure.", "new"),
+      ]),
+    ).toBe("Migrated workspaces.");
+  });
+
+  it("omits stale previews across prompts and turn IDs, including a silent active turn", () => {
+    const older = assistant("Previous run passed.", "old");
+    expect(latestProgress([older, prompt])).toBeNull();
+    expect(latestProgress([older, assistant("Done.", "new")])).toBeNull();
+    expect(latestProgress([older], "new")).toBeNull();
+    expect(latestProgress([older, assistant("Current work is blocked.", "new")], "new")).toBe(
+      "Current work is blocked.",
+    );
+  });
+
+  it("skips code and caps the excerpt at 120 characters without splitting emoji", () => {
+    const text = "🚀".repeat(150);
+    const excerpt = latestProgress([assistant(`\`\`\`sh\nnpm run test\n\`\`\`\n${text}`)]);
+    expect(excerpt).toBe(`${"🚀".repeat(119)}…`);
+  });
+
+  it("shares in-flight loads and cached excerpts for an unchanged agent revision", async () => {
+    const store = createProgressStore();
+    const load = vi.fn(async () => "Updated tests.");
+    const first = vi.fn();
+    const second = vi.fn();
+    const unsubscribe = store.subscribe("same revision", load, first);
+    store.subscribe("same revision", load, second);
+    unsubscribe();
+    await Promise.resolve();
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(first).not.toHaveBeenCalled();
+    expect(second).toHaveBeenCalledOnce();
+    expect(store.get("same revision")).toBe("Updated tests.");
+    expect(store.get("new revision")).toBeNull();
+  });
+
+  it("limits parallel reads and drops queued work for unmounted rows", async () => {
+    const store = createProgressStore();
+    const resolves: ((value: string | null) => void)[] = [];
+    const load = vi.fn(() => new Promise<string | null>((resolve) => resolves.push(resolve)));
+    const noop = () => {};
+    for (let index = 0; index < 4; index += 1) store.subscribe(String(index), load, noop);
+    const dropped = store.subscribe("dropped", load, noop);
+    const retained = vi.fn(async () => null);
+    store.subscribe("retained", retained, noop);
+    dropped();
+    expect(load).toHaveBeenCalledTimes(4);
+    expect(retained).not.toHaveBeenCalled();
+    resolves[0](null);
+    await Promise.resolve();
+    expect(retained).toHaveBeenCalledOnce();
+    expect(load).toHaveBeenCalledTimes(4);
+    resolves.slice(1).forEach((resolve) => resolve(null));
+  });
+});
 
 function agent(overrides: Partial<PaseoAgent> = {}): PaseoAgent {
   return {
