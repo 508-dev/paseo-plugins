@@ -21,14 +21,13 @@ export function InboxScreen({ theme, layout, navigation }: PluginScreenProps) {
   const filters = { hostId, projectKey, showFailures };
   const visible = filterCards(inbox.cards, { ...filters, unreadOnly }, read);
   const scopedUnreadCount = filterCards(inbox.cards, { ...filters, unreadOnly: true }, read).length;
-  const hiddenUnreadFailures =
-    showFailures || !readReady
-      ? 0
-      : filterCards(
-          inbox.cards.filter((card) => card.kind === "failed"),
-          { ...filters, unreadOnly: true, showFailures: true },
-          read,
-        ).length;
+  const unreadFailures = readReady
+    ? filterCards(
+        inbox.cards.filter((card) => card.kind === "failed"),
+        { hostId, projectKey, unreadOnly: true, showFailures: true },
+        read,
+      ).length
+    : 0;
   const failuresToggleDisabled = !readReady || preferences.saving;
   const onlineCount = inbox.hosts.filter((host) => host.status === "online").length;
   const projects = [
@@ -164,8 +163,8 @@ export function InboxScreen({ theme, layout, navigation }: PluginScreenProps) {
               >
                 <Switch
                   accessibilityLabel={
-                    hiddenUnreadFailures > 0
-                      ? `Show failures, ${hiddenUnreadFailures} hidden unread`
+                    unreadFailures > 0
+                      ? `Show failures, ${unreadFailures} unread ${unreadFailures === 1 ? "failure" : "failures"}`
                       : "Show failures"
                   }
                   disabled={failuresToggleDisabled}
@@ -179,7 +178,7 @@ export function InboxScreen({ theme, layout, navigation }: PluginScreenProps) {
                   hitSlop={8}
                 />
                 <Text style={{ color: theme.colors.foreground, fontSize: 13 }}>
-                  Show failures{hiddenUnreadFailures > 0 ? ` (${hiddenUnreadFailures})` : ""}
+                  Show failures{unreadFailures > 0 ? ` (${unreadFailures})` : ""}
                 </Text>
               </View>
             </View>

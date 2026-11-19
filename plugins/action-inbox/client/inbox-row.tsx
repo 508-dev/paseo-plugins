@@ -149,9 +149,23 @@ export function InboxRow({
         <Text style={foreground}>The agent is waiting for your input</Text>
       ) : null}
       {progress ? (
-        <Text numberOfLines={2} style={muted}>
-          Latest update · {progress}
-        </Text>
+        <View
+          style={{
+            marginTop: 2,
+            paddingLeft: 8,
+            borderLeftWidth: 2,
+            borderLeftColor: theme.colors.foregroundMuted,
+          }}
+        >
+          <Text
+            numberOfLines={2}
+            style={{ color: theme.colors.foreground, fontSize: 13, lineHeight: 19 }}
+          >
+            <Text style={{ fontWeight: "600" }}>Latest update</Text>
+            {"  "}
+            {progress}
+          </Text>
+        </View>
       ) : null}
     </>
   );

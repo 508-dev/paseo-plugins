@@ -1,6 +1,6 @@
 # Action inbox
 
-See pending agent questions, tool approvals, and finished work needing review across your online Paseo hosts. Filter the list by host, project, or unread status. Use **Show failures** to include failed runs. The toggle starts off and shows how many unread failures are hidden for the selected host and project. Hidden failures stay unread and are excluded from the sidebar count and bulk **Mark all read**.
+See pending agent questions, tool approvals, and finished work needing review across your online Paseo hosts. Filter the list by host, project, or unread status. Use **Show failures** to include failed runs. The switch starts off and shows the number of unread failures for the selected host and project in either position. Hidden failures stay unread and are excluded from the sidebar count and bulk **Mark all read**.
 
 Requires Paseo 0.16.0-beta.1 or newer on the daemon and app, plus Node and npm on the daemon for Git installation. Preparation installs locked SDK and validation dependencies with lifecycle scripts disabled. Install the plugin on one connected host; it reads the app's existing connections to other hosts. The sidebar and screen share a refresh every 20 seconds while either is mounted, reading up to 1,000 active agents per host.
 
