@@ -11,7 +11,8 @@ function* proseBlocks(message: string) {
   const listItem = /^(?:[-*+]\s+|\d+[.)]\s+)/;
   for (const line of message.split("\n")) {
     const trimmed = line.trim();
-    const marker = trimmed.match(/^(?:`{3,}|~{3,})/)?.[0];
+    const prose = fence ? trimmed : trimmed.replace(listItem, "");
+    const marker = prose.match(/^(?:`{3,}|~{3,})/)?.[0];
     if (!fence && /^(?:=+|-+)$/.test(trimmed)) {
       // A setext underline turns the preceding paragraph into a heading.
       block = [];
@@ -21,7 +22,7 @@ function* proseBlocks(message: string) {
       /^(?:#{1,6}\s|>)/.test(trimmed) ||
       /^(?:summary|update|progress|results?)[:.!]*$/i.test(trimmed.replace(/\*\*|__/g, ""));
     const boundary = !trimmed || marker || heading;
-    if (boundary || listItem.test(trimmed)) {
+    if (boundary || prose !== trimmed) {
       if (block.length) yield block.join(" ");
       block = [];
     }
@@ -31,7 +32,7 @@ function* proseBlocks(message: string) {
         fence = "";
       }
     } else if (!fence && !boundary) {
-      block.push(trimmed.replace(listItem, ""));
+      block.push(prose);
     }
   }
   if (block.length) yield block.join(" ");
@@ -79,6 +80,22 @@ export function latestProgress(
     if (excerpt) return excerpt;
   }
   return null;
+}
+
+export function progressFromPage(
+  page: {
+    agent?: Pick<NonNullable<TimelinePage["agent"]>, "updatedAt"> | null;
+    entries: readonly TimelineEntry[];
+    error: TimelinePage["error"];
+  },
+  updatedAt: string,
+  activeTurnId?: string,
+): string | null {
+  if (page.error) throw new Error(page.error);
+  if (page.agent?.updatedAt !== updatedAt) {
+    throw new Error("Timeline revision could not be verified");
+  }
+  return latestProgress(page.entries, activeTurnId);
 }
 
 type ProgressEntry = {

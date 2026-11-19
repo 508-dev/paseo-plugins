@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { getPaseoClient, useHosts, type PluginHostSummary } from "@getpaseo/plugin/client";
 import { cardsForAgent, type InboxCard } from "./inbox-model";
-import { createProgressStore, latestProgress } from "./inbox-progress";
+import { createProgressStore, progressFromPage } from "./inbox-progress";
 import { createInboxStore } from "./inbox-store";
 
 async function loadHost(host: PluginHostSummary) {
@@ -44,12 +44,11 @@ export function useInboxProgress({ hostId, agentId, agentUpdatedAt, activeTurnId
             projection: "projected",
             limit: 24,
           });
-          if (page.error) throw new Error(page.error);
-          return latestProgress(page.entries, activeTurnId);
+          return progressFromPage(page, agentUpdatedAt, activeTurnId);
         },
         listener,
       ),
-    [key, hostId, agentId, activeTurnId],
+    [key, hostId, agentId, agentUpdatedAt, activeTurnId],
   );
   const snapshot = useCallback(() => progressStore.get(key), [key]);
   return useSyncExternalStore(subscribe, snapshot, snapshot);

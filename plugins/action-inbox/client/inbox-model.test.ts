@@ -14,7 +14,7 @@ import {
   type Permission,
 } from "./inbox-model";
 import { createInboxStore } from "./inbox-store";
-import { createProgressStore, latestProgress } from "./inbox-progress";
+import { createProgressStore, latestProgress, progressFromPage } from "./inbox-progress";
 import { createApprovalStore } from "./inbox-approvals";
 
 const location = {
@@ -30,6 +30,40 @@ describe("latest progress previews", () => {
     item: { type: "assistant_message" as const, text },
   });
   const prompt = { item: { type: "user_message" as const, text: "Try again" } };
+
+  it("omits list-prefixed fenced code and keeps ordinary list prose", () => {
+    expect(latestProgress([assistant("- ```sh\nnpm test\n  ```\nTests passed.")])).toBe(
+      "Tests passed.",
+    );
+    expect(latestProgress([assistant("1. ~~~sh\nnpm test\n   ~~~\n2. Tests passed.")])).toBe(
+      "Tests passed.",
+    );
+    expect(latestProgress([assistant("- Updated the migration\nand verified the upgrade.")])).toBe(
+      "Updated the migration and verified the upgrade.",
+    );
+  });
+
+  it("retries unverified timeline pages and caches only a matching revision", async () => {
+    const store = createProgressStore();
+    const updatedAt = "2026-11-20T08:00:00Z";
+    const entries = [assistant("Preview confirmed.")];
+    const read = vi
+      .fn()
+      .mockResolvedValueOnce({ agent: { updatedAt: "2026-11-20T08:01:00Z" }, entries, error: null })
+      .mockResolvedValueOnce({ agent: null, entries, error: null })
+      .mockResolvedValueOnce({ agent: { updatedAt }, entries, error: null });
+    const settled = vi.fn();
+    store.subscribe("revision", async () => progressFromPage(await read(), updatedAt), settled);
+    await vi.waitFor(() => expect(settled).toHaveBeenCalledTimes(1));
+    expect(store.get("revision")).toBeNull();
+    store.retryFailed();
+    await vi.waitFor(() => expect(settled).toHaveBeenCalledTimes(2));
+    expect(store.get("revision")).toBeNull();
+    store.retryFailed();
+    await vi.waitFor(() => expect(store.get("revision")).toBe("Preview confirmed."));
+    store.retryFailed();
+    expect(read).toHaveBeenCalledTimes(3);
+  });
 
   it("takes the first substantive sentence of the newest useful message", () => {
     expect(
