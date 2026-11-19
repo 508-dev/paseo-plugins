@@ -8,7 +8,7 @@ import {
   type PluginHostProps,
   type PluginClientContext,
 } from "@getpaseo/plugin/client";
-import { ExternalLink, ScrollView, TextInput } from "@getpaseo/plugin/client/ui";
+import { ExternalLink, Icon, TextInput } from "@getpaseo/plugin/client/ui";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pressable, Text, View } from "react-native";
@@ -45,8 +45,8 @@ export function WatchPopover(props: WatchPopoverProps) {
 }
 
 function WorkspaceWatchForm(props: WatchPopoverProps) {
-  const { workspaceId, host, theme, layout } = props;
-  const workspace = useWorkspace(workspaceId, ({ name, branch }) => ({ name, branch }));
+  const { workspaceId, host, theme } = props;
+  const workspaceBranch = useWorkspace(workspaceId, ({ branch }) => branch);
   const agentRefs = useAgents({
     hosts: [host.id],
     where: (agent) => agent.workspaceId === workspaceId && agent.status !== "closed",
@@ -58,7 +58,7 @@ function WorkspaceWatchForm(props: WatchPopoverProps) {
   const resolve = useRpc(resolveUncertain);
   const queryClient = useQueryClient();
   const discoveryQuery = useQuery({
-    queryKey: ["pr-discovery", host.id, workspaceId, workspace?.branch],
+    queryKey: ["pr-discovery", host.id, workspaceId, workspaceBranch],
     queryFn: () => detect({ workspaceId }),
     retry: false,
     staleTime: 30_000,
@@ -83,7 +83,8 @@ function WorkspaceWatchForm(props: WatchPopoverProps) {
   const error = mutation.error ?? discoveryQuery.error ?? watchesQuery.error;
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const [selectedPr, setSelectedPr] = useState<string | null>(null);
-  const [manual, setManual] = useState(false);
+  const [prSource, setPrSource] = useState<"detected" | "url" | null>(null);
+  const [choosingAgent, setChoosingAgent] = useState(false);
   const [setupRequested, setSetupRequested] = useState(false);
   const [url, setUrl] = useState("");
   const currentAgent = props.context === "agent" ? props.agentId : null;
@@ -92,11 +93,12 @@ function WorkspaceWatchForm(props: WatchPopoverProps) {
     currentAgent ??
     props.preferredAgentId ??
     (agentRefs.length === 1 ? agentRefs[0].id : null);
-  const eligibleAgent = agentRefs.some((ref) => ref.id === agentId);
+  const recipient = agentRefs.find((ref) => ref.id === agentId);
   const candidates = discovery?.pullRequests ?? [];
   const selectedCandidate = candidates.find((pr) => pr.url === selectedPr);
   const detectedUrl =
     selectedCandidate?.url ?? (candidates.length === 1 ? candidates[0].url : null);
+  const manual = prSource === "url" || (prSource === null && !!discovery && !candidates.length);
   const pullRequest = manual ? url.trim() : detectedUrl;
   const workspaceWatches = watches.filter((watch) =>
     watch.workspaceId
@@ -127,188 +129,292 @@ function WorkspaceWatchForm(props: WatchPopoverProps) {
 
   const foreground = { color: theme.colors.foreground };
   const muted = { color: theme.colors.foregroundMuted, fontSize: 13 };
-  const activeSelection = {
-    borderColor: theme.colors.accent,
-    backgroundColor: theme.colors.surface2,
-  };
-  const selectionStyle = {
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: 8,
-    padding: 12,
-    gap: 4,
-  };
+  const sectionLabel = { ...foreground, fontSize: 13, fontWeight: "600" as const };
+  const title = configuring ? "Watch a pull request" : "Watched pull requests";
 
   return (
-    <ScrollView
-      style={{ maxHeight: layout.compact ? undefined : 560, width: layout.compact ? "100%" : 380 }}
-      contentContainerStyle={{ padding: 16, gap: 12 }}
+    <View
+      style={{ gap: 8, width: props.layout.compact ? undefined : 344, maxWidth: "100%" }}
       testID="workspace-pr-watcher"
     >
-      <Text style={{ ...foreground, fontSize: 16, fontWeight: "600" }}>PR watcher</Text>
-      <Text style={muted}>
-        {workspace?.name} · {discovery?.branch ?? workspace?.branch ?? "Detached HEAD"}
-      </Text>
-      <Text style={muted}>
-        Send an agent follow-ups for new failing checks, reviews, and merge conflicts. Watching
-        never merges the PR.
-      </Text>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+        <Text
+          accessibilityRole="header"
+          style={{ ...foreground, flex: 1, fontSize: 16, fontWeight: "600" }}
+        >
+          {title}
+        </Text>
+        {configuring && workspaceWatches.length > 0 ? (
+          <TextAction
+            theme={theme}
+            label="Back"
+            disabled={busy}
+            onPress={() => setSetupRequested(false)}
+          />
+        ) : null}
+        <TextAction theme={theme} label="Refresh" disabled={busy || loading} onPress={refresh} />
+      </View>
       {error ? (
         <Text accessibilityRole="alert" style={{ color: theme.colors.statusDanger }}>
           {error.message}
         </Text>
       ) : null}
-      {loading ? <Text style={muted}>Finding pull requests…</Text> : null}
-      {workspaceWatches.map((watch) => (
-        <WatchDetails
-          key={watch.id}
-          watch={watch}
-          theme={theme}
-          busy={busy}
-          onRemove={() => void run(() => remove({ id: watch.id }))}
-          onResolve={(action) => void run(() => resolve({ id: watch.id, action }))}
-        />
-      ))}
-      {workspaceWatches.length > 0 && !configuring ? (
-        <WatchAction
-          theme={theme}
-          label="Watch another PR or agent"
-          disabled={busy}
-          onPress={() => setSetupRequested(true)}
-        />
-      ) : null}
-      {configuring && !loading && discovery ? (
+      {configuring ? (
         <>
-          {discovery.error ? (
-            <Text style={{ color: theme.colors.statusWarning }}>{discovery.error}</Text>
-          ) : null}
-          {!manual && candidates.length === 0 ? (
-            <Text style={muted}>
-              No open pull request found for this branch. Create a PR first, or enter its URL below.
-            </Text>
-          ) : null}
-          {!manual
-            ? candidates.map((pr) => (
-                <Pressable
-                  key={pr.url}
-                  accessibilityRole="radio"
-                  accessibilityState={{ checked: detectedUrl === pr.url }}
-                  accessibilityLabel={`${pr.repository}#${pr.number}: ${pr.title}`}
-                  disabled={busy}
-                  onPress={() => setSelectedPr(pr.url)}
-                  style={[selectionStyle, detectedUrl === pr.url ? activeSelection : null]}
-                >
-                  <Text style={{ ...foreground, fontWeight: "600" }}>
-                    {pr.repository}#{pr.number}
-                  </Text>
-                  <Text style={muted}>{pr.title}</Text>
-                </Pressable>
-              ))
-            : null}
-          <WatchAction
-            theme={theme}
-            label={manual ? "Use detected pull requests" : "Enter a PR URL instead"}
-            disabled={busy}
-            onPress={() => setManual(!manual)}
-          />
-          {manual ? (
-            <TextInput
-              accessibilityLabel="GitHub pull request URL"
-              placeholder="https://github.com/owner/repo/pull/123"
-              placeholderTextColor={theme.colors.foregroundMuted}
-              autoCapitalize="none"
-              autoCorrect={false}
-              value={url}
-              onChangeText={setUrl}
-              editable={!busy}
+          <Text style={muted}>Follow up on check failures, reviews, and merge conflicts.</Text>
+          <View style={{ gap: 2 }}>
+            <View
               style={{
-                ...foreground,
-                borderWidth: 1,
-                borderColor: theme.colors.border,
-                borderRadius: 8,
-                padding: 12,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 8,
               }}
-            />
-          ) : null}
-          <Text style={{ ...foreground, fontWeight: "600" }}>Send follow-ups to</Text>
-          {agentRefs.length === 0 ? (
-            <Text style={muted}>Open an agent in this workspace to start watching.</Text>
-          ) : null}
-          {agentRefs.map((ref) => (
-            <AgentChoice
-              key={ref.key}
-              id={ref.id}
-              selected={agentId === ref.id}
-              disabled={busy}
-              onSelect={setSelectedAgent}
-              theme={theme}
-            />
-          ))}
+            >
+              <Text style={sectionLabel}>Pull request</Text>
+              {candidates.length > 0 || !manual ? (
+                <TextAction
+                  theme={theme}
+                  label={manual ? "Use detected PRs" : "Enter URL"}
+                  disabled={busy}
+                  onPress={() => setPrSource(manual ? "detected" : "url")}
+                />
+              ) : null}
+            </View>
+            {discovery?.error ? (
+              <Text
+                accessibilityRole="alert"
+                style={{ ...muted, color: theme.colors.statusWarning }}
+              >
+                {discovery.error}
+              </Text>
+            ) : null}
+            {manual ? (
+              <TextInput
+                accessibilityLabel="GitHub pull request URL"
+                placeholder="https://github.com/owner/repo/pull/123"
+                placeholderTextColor={theme.colors.foregroundMuted}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+                value={url}
+                onChangeText={(value) => {
+                  setPrSource("url");
+                  setUrl(value);
+                }}
+                editable={!busy}
+                style={{
+                  ...foreground,
+                  borderWidth: 1,
+                  borderColor: theme.colors.border,
+                  borderRadius: 8,
+                  padding: 10,
+                }}
+              />
+            ) : (
+              <>
+                {loading && !candidates.length ? (
+                  <Text style={muted}>Finding pull requests…</Text>
+                ) : null}
+                {!loading && discovery && !discovery.error && !candidates.length ? (
+                  <Text style={muted}>No open pull request found for this branch.</Text>
+                ) : null}
+                {candidates.map((pr) => (
+                  <SelectionRow
+                    key={pr.url}
+                    theme={theme}
+                    title={pr.title || `#${pr.number}`}
+                    detail={`${pr.repository}#${pr.number}`}
+                    selected={detectedUrl === pr.url}
+                    disabled={busy}
+                    onPress={candidates.length > 1 ? () => setSelectedPr(pr.url) : undefined}
+                  />
+                ))}
+              </>
+            )}
+          </View>
+          <View style={{ gap: 2 }}>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 8,
+              }}
+            >
+              <Text style={sectionLabel}>Send follow-ups to</Text>
+              {recipient && agentRefs.length > 1 ? (
+                <TextAction
+                  theme={theme}
+                  label={choosingAgent ? "Done" : "Change agent"}
+                  disabled={busy}
+                  onPress={() => setChoosingAgent(!choosingAgent)}
+                />
+              ) : null}
+            </View>
+            {agentRefs.length === 0 ? (
+              <Text style={muted}>Open an agent in this workspace to start watching.</Text>
+            ) : recipient && !choosingAgent ? (
+              <AgentChoice id={recipient.id} theme={theme} />
+            ) : (
+              agentRefs.map((ref) => (
+                <AgentChoice
+                  key={ref.key}
+                  id={ref.id}
+                  theme={theme}
+                  selected={agentId === ref.id}
+                  disabled={busy}
+                  onPress={() => {
+                    setSelectedAgent(ref.id);
+                    setChoosingAgent(false);
+                  }}
+                />
+              ))
+            )}
+          </View>
           <WatchAction
             theme={theme}
             primary
-            label={
-              busy ? "Updating…" : alreadyWatching ? "Already watching for this agent" : "Watch PR"
+            label={busy ? "Starting watch…" : alreadyWatching ? "Already watching" : "Watch PR"}
+            disabled={
+              busy || loading || !discovery || !recipient || !pullRequest || alreadyWatching
             }
-            disabled={busy || !eligibleAgent || !pullRequest || alreadyWatching}
             onPress={() => {
-              if (!agentId || !pullRequest) return;
+              if (!discovery || !recipient || !pullRequest) return;
               void run(async () => {
-                await add({ workspaceId, agentId, pullRequest, expectedBranch: discovery.branch });
+                await add({
+                  workspaceId,
+                  agentId: recipient.id,
+                  pullRequest,
+                  expectedBranch: discovery.branch,
+                });
                 setSetupRequested(false);
               });
             }}
           />
-          <Text style={muted}>
-            Checks every 2 minutes. At least 10 minutes between follow-ups; pauses after 5. Existing
-            events form the starting baseline.
-          </Text>
         </>
-      ) : null}
+      ) : (
+        <>
+          {workspaceWatches.map((watch) => (
+            <WatchDetails
+              key={watch.id}
+              watch={watch}
+              theme={theme}
+              busy={busy}
+              onRemove={() => void run(() => remove({ id: watch.id }))}
+              onResolve={(action) => void run(() => resolve({ id: watch.id, action }))}
+            />
+          ))}
+          <WatchAction
+            theme={theme}
+            label="Add a watch"
+            disabled={busy}
+            onPress={() => setSetupRequested(true)}
+          />
+        </>
+      )}
+    </View>
+  );
+}
 
-      <WatchAction
-        theme={theme}
-        label="Refresh"
-        disabled={busy || loading}
-        onPress={() => void refresh()}
-      />
-    </ScrollView>
+function TextAction({
+  theme,
+  label,
+  disabled,
+  onPress,
+}: {
+  theme: PluginHostProps["theme"];
+  label: string;
+  disabled: boolean;
+  onPress(): void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      disabled={disabled}
+      onPress={onPress}
+      hitSlop={8}
+      style={({ pressed }) => ({
+        justifyContent: "center",
+        minHeight: 28,
+        paddingHorizontal: 4,
+        opacity: disabled ? 0.45 : pressed ? 0.7 : 1,
+      })}
+    >
+      <Text
+        style={{ color: theme.colors.foreground, fontSize: 13, textDecorationLine: "underline" }}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+type SelectionRowProps = {
+  theme: PluginHostProps["theme"];
+  title: string;
+  detail?: string;
+  selected?: boolean;
+  disabled?: boolean;
+  onPress?(): void;
+};
+
+function SelectionRow({ theme, title, detail, selected, disabled, onPress }: SelectionRowProps) {
+  const style = {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    backgroundColor: theme.colors.surface1,
+    borderColor: onPress && selected ? theme.colors.accent : theme.colors.border,
+  };
+  const content = (
+    <>
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text
+          numberOfLines={onPress ? 2 : 1}
+          style={{ color: theme.colors.foreground, fontWeight: "600" }}
+        >
+          {title}
+        </Text>
+        {detail ? (
+          <Text numberOfLines={1} style={{ color: theme.colors.foregroundMuted, fontSize: 12 }}>
+            {detail}
+          </Text>
+        ) : null}
+      </View>
+      {onPress && selected ? <Icon name="Check" size={16} color={theme.colors.foreground} /> : null}
+    </>
+  );
+  if (!onPress) return <View style={style}>{content}</View>;
+  return (
+    <Pressable
+      accessibilityRole="radio"
+      accessibilityLabel={detail ? `${title}, ${detail}` : title}
+      accessibilityState={{ checked: !!selected, disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [style, pressed ? { backgroundColor: theme.colors.surface2 } : null]}
+    >
+      {content}
+    </Pressable>
   );
 }
 
 function AgentChoice({
   id,
-  selected,
-  disabled,
-  onSelect,
-  theme,
-}: {
-  id: string;
-  selected: boolean;
-  disabled: boolean;
-  onSelect(id: string): void;
-  theme: PluginHostProps["theme"];
-}) {
+  ...props
+}: Omit<SelectionRowProps, "title" | "detail"> & { id: string }) {
   const agent = useAgent(id, ({ title, provider }) => ({ title, provider }));
   return (
-    <Pressable
-      accessibilityRole="radio"
-      accessibilityState={{ checked: selected }}
-      disabled={disabled}
-      onPress={() => onSelect(id)}
-      style={{
-        padding: 12,
-        borderRadius: 8,
-        backgroundColor: selected ? theme.colors.surface2 : theme.colors.surface0,
-        borderWidth: 1,
-        borderColor: selected ? theme.colors.accent : theme.colors.border,
-      }}
-    >
-      <Text style={{ color: theme.colors.foreground }}>
-        {agent?.title ?? `Agent ${id.slice(0, 8)}`}
-      </Text>
-      <Text style={{ color: theme.colors.foregroundMuted, fontSize: 12 }}>{agent?.provider}</Text>
-    </Pressable>
+    <SelectionRow
+      {...props}
+      title={agent?.title ?? `Agent ${id.slice(0, 8)}`}
+      detail={agent?.provider}
+    />
   );
 }
 
@@ -391,16 +497,22 @@ export function WatchAction({
       accessibilityLabel={label}
       disabled={disabled}
       onPress={onPress}
-      style={{
+      style={({ pressed }) => ({
         minHeight: 44,
         justifyContent: "center",
         paddingHorizontal: 12,
         borderRadius: 8,
-        opacity: disabled ? 0.5 : 1,
+        opacity: disabled ? 0.5 : pressed ? 0.8 : 1,
         backgroundColor: primary ? theme.colors.accent : theme.colors.surface1,
-      }}
+      })}
     >
-      <Text style={{ color: primary ? theme.colors.accentForeground : theme.colors.foreground }}>
+      <Text
+        style={{
+          color: primary ? theme.colors.accentForeground : theme.colors.foreground,
+          textAlign: primary ? "center" : "left",
+          fontWeight: primary ? "600" : "400",
+        }}
+      >
         {label}
       </Text>
     </Pressable>
