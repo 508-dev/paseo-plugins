@@ -2,16 +2,16 @@
 
 Paseo plugins maintained by [508.dev](https://508.dev). Each plugin is installed separately from its directory under `plugins/`.
 
-| Plugin                                             | What it does                                                      | Paseo requirement        |
-| -------------------------------------------------- | ----------------------------------------------------------------- | ------------------------ |
-| [Project environment](plugins/project-environment) | Search project variables and use current values in agent commands | >=0.13.2                 |
-| [Agent context](plugins/agent-context)             | Attach a bounded snapshot of another agent's conversation         | >=0.9.0                  |
-| [PR watcher](plugins/pr-watcher)                   | Follow GitHub checks/reviews and wake the associated agent        | >=0.16.0-beta.1, <0.17.0 |
-| [GitHub issue workflow](plugins/issue-workflow)    | Start workspaces from GitHub issues                               | >=0.16.0-beta.1          |
-| [Action inbox](plugins/action-inbox)               | Find agent requests and review-ready work across hosts            | >=0.16.0-beta.1          |
-| [Remote browser](plugins/remote-browser)           | Control a host browser or forward a local dev site                | >=0.16.0-beta.1          |
-| [Replies](plugins/replies)                         | Suggest replies you can edit before sending                       | >=0.16.0-beta.2          |
-| [Worktree include](plugins/worktreeinclude)        | Copy or symlink gitignored files into new worktrees               | >=0.10.3                 |
+| Plugin                                             | What it does                                                      | Paseo requirement                          |
+| -------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------ |
+| [Project environment](plugins/project-environment) | Search project variables and use current values in agent commands | >=0.13.2                                   |
+| [Agent context](plugins/agent-context)             | Attach a bounded snapshot of another agent's conversation         | >=0.9.0                                    |
+| [PR watcher](plugins/pr-watcher)                   | Follow GitHub checks/reviews and wake the associated agent        | >=0.16.0-beta.1, <0.17.0; or 0.17.0-beta.1 |
+| [GitHub issue workflow](plugins/issue-workflow)    | Start workspaces from GitHub issues                               | >=0.16.0-beta.1                            |
+| [Action inbox](plugins/action-inbox)               | Find agent requests and review-ready work across hosts            | >=0.16.0-beta.1                            |
+| [Remote browser](plugins/remote-browser)           | Control a host browser or forward a local dev site                | >=0.16.0-beta.1                            |
+| [Replies](plugins/replies)                         | Suggest replies you can edit before sending                       | >=0.16.0-beta.2                            |
+| [Worktree include](plugins/worktreeinclude)        | Copy or symlink gitignored files into new worktrees               | >=0.10.3                                   |
 
 ## Install
 
