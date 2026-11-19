@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { ScrollView, Switch, Text, View } from "react-native";
 import { getPaseoClient, useSettings, type PluginScreenProps } from "@getpaseo/plugin/client";
 import { inboxPreferences } from "../shared/preferences";
 import { filterCards, isUnread, markRead, type InboxCard } from "./inbox-model";
@@ -29,6 +29,7 @@ export function InboxScreen({ theme, layout, navigation }: PluginScreenProps) {
           { ...filters, unreadOnly: true, showFailures: true },
           read,
         ).length;
+  const failuresToggleDisabled = !readReady || preferences.saving;
   const onlineCount = inbox.hosts.filter((host) => host.status === "online").length;
   const projects = [
     ...new Map(
@@ -52,12 +53,9 @@ export function InboxScreen({ theme, layout, navigation }: PluginScreenProps) {
     await preferences.save({ ...preferences.values, readTokens: next }, preferences.revision);
   }
 
-  async function toggleFailures() {
+  async function setShowFailures(value: boolean) {
     if (preferences.status !== "ready" || preferences.saving) return;
-    await preferences.save(
-      { ...preferences.values, showFailures: !preferences.values.showFailures },
-      preferences.revision,
-    );
+    await preferences.save({ ...preferences.values, showFailures: value }, preferences.revision);
   }
 
   const muted = { color: theme.colors.foregroundMuted, fontSize: 12 };
@@ -125,6 +123,36 @@ export function InboxScreen({ theme, layout, navigation }: PluginScreenProps) {
               theme={theme}
               compact={layout.compact}
             />
+            <View
+              style={{
+                minHeight: layout.compact ? 44 : 32,
+                paddingHorizontal: 8,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+                opacity: failuresToggleDisabled ? 0.5 : 1,
+              }}
+            >
+              <Switch
+                accessibilityLabel={
+                  hiddenUnreadFailures > 0
+                    ? `Show failures, ${hiddenUnreadFailures} hidden unread`
+                    : "Show failures"
+                }
+                disabled={failuresToggleDisabled}
+                value={showFailures}
+                onValueChange={(value) => void setShowFailures(value)}
+                trackColor={{ false: theme.colors.surface2, true: theme.colors.accent }}
+                thumbColor={
+                  showFailures ? theme.colors.accentForeground : theme.colors.foregroundMuted
+                }
+                ios_backgroundColor={theme.colors.surface2}
+                hitSlop={8}
+              />
+              <Text style={{ color: theme.colors.foreground, fontSize: 13 }}>
+                Show failures{hiddenUnreadFailures > 0 ? ` (${hiddenUnreadFailures})` : ""}
+              </Text>
+            </View>
           </View>
           <View
             style={{
@@ -152,20 +180,6 @@ export function InboxScreen({ theme, layout, navigation }: PluginScreenProps) {
                 onPress={() => setUnreadOnly(true)}
               >
                 Unread{readReady ? ` ${scopedUnreadCount}` : ""}
-              </InboxButton>
-              <InboxButton
-                theme={theme}
-                compact={layout.compact}
-                selected={showFailures}
-                disabled={!readReady || preferences.saving}
-                onPress={() => void toggleFailures()}
-                label={
-                  hiddenUnreadFailures > 0
-                    ? `Show failures, ${hiddenUnreadFailures} hidden unread`
-                    : "Show failures"
-                }
-              >
-                Show failures{hiddenUnreadFailures > 0 ? ` (${hiddenUnreadFailures})` : ""}
               </InboxButton>
             </View>
             <InboxButton
