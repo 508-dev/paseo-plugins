@@ -1,5 +1,29 @@
 import { expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { assertPluginCompatibility } from "@getpaseo/protocol/plugin-requirements";
 import { validateWorkspaceWatch, type WorkspaceWatchAccess } from "./workspace.js";
+
+const manifest = JSON.parse(
+  readFileSync(new URL("../paseo-plugin.json", import.meta.url), "utf8"),
+) as { id: string; requirements: { paseo: string } };
+
+it.each(["0.16.0-beta.1", "0.16.1", "0.17.0-beta.1"])(
+  "admits the supported Paseo version %s on both runtimes",
+  (version) => {
+    for (const runtime of ["daemon", "app"] as const) {
+      expect(() => assertPluginCompatibility({ ...manifest, version, runtime })).not.toThrow();
+    }
+  },
+);
+
+it.each(["0.15.4", "0.17.0-beta.2", "0.17.0", "0.18.0-beta.1", "0.18.0"])(
+  "retains the compatibility boundary for Paseo %s",
+  (version) => {
+    expect(() => assertPluginCompatibility({ ...manifest, version, runtime: "daemon" })).toThrow(
+      "requires Paseo",
+    );
+  },
+);
 
 const input = {
   workspaceId: "workspace-a",

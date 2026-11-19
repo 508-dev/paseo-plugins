@@ -4,7 +4,7 @@ An opt-in [Paseo](https://paseo.sh) plugin that watches a GitHub PR and sends it
 
 ## Setup
 
-1. Run Paseo 0.16.0 beta 1 or newer within the 0.16 series on the daemon and app.
+1. Run Paseo 0.16.0 beta 1 or newer within the 0.16 series, or 0.17.0-beta.1, on the daemon and app.
 2. Install and authenticate `gh` on the daemon machine. The authenticated account needs read access to the PRs you watch.
 3. Enable plugins on the target daemon in **Settings → Plugins → Enable plugins**. Plugins are trusted code that can access the daemon machine.
 4. Install with `paseo plugin install git:508-dev/paseo-plugins:plugins/pr-watcher`. The daemon needs Node and npm on its command path; the manifest installs the locked SDK and validation dependencies with lifecycle scripts disabled.
