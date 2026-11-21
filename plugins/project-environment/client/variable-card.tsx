@@ -10,6 +10,7 @@ import type { z } from "zod";
 
 interface VariableCardProps {
   target: VariableTarget;
+  hostId: string;
   name: string;
   description: string;
   theme: PluginTheme;
@@ -18,6 +19,7 @@ interface VariableCardProps {
 }
 export function VariableCard({
   target,
+  hostId,
   name,
   description,
   theme,
@@ -76,7 +78,13 @@ export function VariableCard({
         </Text>
       ) : null}
       {state.mode === "view" ? (
-        <ValueControls target={target} name={name} description={description} theme={theme}>
+        <ValueControls
+          target={target}
+          hostId={hostId}
+          name={name}
+          description={description}
+          theme={theme}
+        >
           <ActionButton label="Replace" onPress={begin} theme={theme} />
           <ActionButton label="Remove" onPress={editor.confirmRemove} theme={theme} />
         </ValueControls>

@@ -17,12 +17,20 @@ import { VariableValueController } from "./value-controller";
 
 interface ValueControlsProps {
   target: VariableTarget;
+  hostId: string;
   name: string;
   description: string;
   theme: PluginTheme;
   children?: ReactNode;
 }
-export function ValueControls({ target, name, description, theme, children }: ValueControlsProps) {
+export function ValueControls({
+  target,
+  hostId,
+  name,
+  description,
+  theme,
+  children,
+}: ValueControlsProps) {
   const read = useRpc(readVariableValue);
   const [controller] = useState(
     () =>
@@ -115,7 +123,7 @@ export function ValueControls({ target, name, description, theme, children }: Va
           {state.message}
         </Text>
       ) : null}
-      <CopyDestination name={name} source={target} theme={theme}>
+      <CopyDestination name={name} source={target} hostId={hostId} theme={theme}>
         {children}
       </CopyDestination>
     </>

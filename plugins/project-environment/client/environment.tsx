@@ -185,6 +185,7 @@ function ScopedEnvironment({
             <VariableCard
               key={variable.name}
               target={target}
+              hostId={host.id}
               name={variable.name}
               description={variable.description}
               theme={theme}

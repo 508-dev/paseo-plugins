@@ -24,11 +24,13 @@ const failures: Record<Exclude<CopyStatus, "copied">, string> = {
 export function CopyDestination({
   name,
   source,
+  hostId,
   theme,
   children,
 }: {
   name: string;
   source: VariableTarget;
+  hostId: string;
   theme: PluginTheme;
   children?: ReactNode;
 }) {
@@ -39,7 +41,7 @@ export function CopyDestination({
   const [query, setQuery] = useState("");
   const [destination, setDestination] = useState<Destination | null>(null);
   const destinations = useQuery({
-    queryKey: ["project-environment-destinations"],
+    queryKey: ["project-environment-destinations", hostId],
     queryFn: () => list({}),
     enabled: open,
     staleTime: 15_000,
@@ -49,8 +51,8 @@ export function CopyDestination({
     onSuccess(result) {
       if (result.status !== "copied") return;
       setOpen(false);
-      void queryClient.invalidateQueries({ queryKey: ["project-environment"] });
-      void queryClient.invalidateQueries({ queryKey: ["project-environment-catalogue"] });
+      void queryClient.invalidateQueries({ queryKey: ["project-environment", hostId] });
+      void queryClient.invalidateQueries({ queryKey: ["project-environment-catalogue", hostId] });
     },
   });
   const { mutate, reset, isPending } = transfer;
