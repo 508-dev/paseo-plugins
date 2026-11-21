@@ -1,9 +1,11 @@
 import { useMemo } from "react";
 import { Pressable, Text } from "react-native";
 import type { PluginTheme } from "@getpaseo/plugin";
+import { Icon } from "@getpaseo/plugin/client/ui";
 
 interface ActionButtonProps {
   label: string;
+  icon?: string;
   onPress(): void;
   theme: PluginTheme;
   disabled?: boolean;
@@ -12,6 +14,7 @@ interface ActionButtonProps {
 }
 export function ActionButton({
   label,
+  icon,
   onPress,
   theme,
   disabled = false,
@@ -32,19 +35,21 @@ export function ActionButton({
     }
     return {
       button: {
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        minHeight: 40,
+        paddingHorizontal: icon ? 0 : 12,
+        paddingVertical: icon ? 0 : 8,
+        minWidth: icon ? 44 : undefined,
+        minHeight: icon ? 44 : 40,
+        alignItems: "center" as const,
         justifyContent: "center" as const,
         borderRadius: 8,
-        borderWidth: 1,
+        borderWidth: icon ? 0 : 1,
         borderColor: theme.colors.border,
         backgroundColor,
         opacity: disabled ? 0.5 : 1,
       },
       text: { color, fontSize: 13, fontWeight: "500" as const },
     };
-  }, [theme, variant, disabled]);
+  }, [theme, variant, disabled, icon]);
   return (
     <Pressable
       accessibilityRole="button"
@@ -54,7 +59,11 @@ export function ActionButton({
       onPress={onPress}
       style={styles.button}
     >
-      <Text style={styles.text}>{label}</Text>
+      {icon ? (
+        <Icon name={icon} size={17} color={styles.text.color} />
+      ) : (
+        <Text style={styles.text}>{label}</Text>
+      )}
     </Pressable>
   );
 }

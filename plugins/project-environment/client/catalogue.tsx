@@ -109,8 +109,6 @@ function VariableResult({
 }) {
   const styles = useMemo(
     () => ({
-      name: { color: theme.colors.foreground, fontSize: 14, fontWeight: "600" as const },
-      detail: { color: theme.colors.foregroundMuted, fontSize: 13 },
       card: {
         padding: 16,
         gap: 10,
@@ -124,11 +122,7 @@ function VariableResult({
   );
   return (
     <View style={styles.card}>
-      <Text selectable style={styles.name}>
-        {name}
-      </Text>
-      {description ? <Text style={styles.detail}>{description}</Text> : null}
-      <ValueControls target={target} name={name} theme={theme} />
+      <ValueControls target={target} name={name} description={description} theme={theme} />
     </View>
   );
 }

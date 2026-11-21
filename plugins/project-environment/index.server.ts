@@ -7,6 +7,9 @@ import {
   removeVariable,
   readVariableValue,
   variableCatalogue,
+  variableDestinations,
+  copyVariable,
+  type VariableTarget,
 } from "./shared/environment";
 import { EnvironmentBroker, toolInstructions } from "./server/broker";
 import { buildVariableCatalogue, readWorkspaceDirectory } from "./server/catalogue";
@@ -16,6 +19,12 @@ async function resolveProject(paseo: PluginHandlerContext["paseo"], workspaceId:
   const workspace = await paseo.workspaces.ref(workspaceId).refresh();
   if (!workspace) throw new Error("Workspace is unavailable");
   return projectScope(workspace.workspaceDirectory);
+}
+
+async function resolveSource(paseo: PluginHandlerContext["paseo"], target: VariableTarget) {
+  return target.kind === "project"
+    ? { id: target.scopeId }
+    : workspaceScope(await resolveProject(paseo, target.workspaceId));
 }
 
 export default function contribute(server: PluginServerContext) {
@@ -65,10 +74,43 @@ export default function contribute(server: PluginServerContext) {
   });
   server.handle(readVariableValue, async ({ target, name }, { paseo }) => {
     await start();
-    if (target.kind === "project")
-      return { value: await broker.store.readValue({ id: target.scopeId }, name) };
-    const scope = await workspaceScope(await resolveProject(paseo, target.workspaceId));
-    return { value: await broker.store.readValue(scope, name) };
+    return { value: await broker.store.readValue(await resolveSource(paseo, target), name) };
+  });
+  server.handle(variableDestinations, async (_input, { paseo }) => {
+    const [projects, workspaces] = await Promise.all([
+      paseo.projects.list(),
+      readWorkspaceDirectory(paseo),
+    ]);
+    return {
+      destinations: [
+        ...projects.projects.map((project) => ({
+          target: { kind: "project" as const, projectId: project.projectId },
+          label: `${project.projectDisplayName} · Project defaults`,
+          directory: project.projectRootPath,
+        })),
+        ...workspaces.map((workspace) => ({
+          target: { kind: "workspace" as const, workspaceId: workspace.id },
+          label: `${workspace.projectDisplayName} · ${workspace.name} · Workspace variables`,
+          directory: workspace.workspaceDirectory,
+        })),
+      ].toSorted(
+        (a, b) => a.label.localeCompare(b.label) || a.directory.localeCompare(b.directory),
+      ),
+    };
+  });
+  server.handle(copyVariable, async ({ source, destination, name }, { paseo }) => {
+    await start();
+    const from = await resolveSource(paseo, source);
+    if (destination.kind === "workspace") {
+      const workspace = await workspaceScope(await resolveProject(paseo, destination.workspaceId));
+      return { status: await broker.store.copy(from, workspace, name) };
+    }
+    const { projects } = await paseo.projects.list();
+    const project = projects.find(({ projectId }) => projectId === destination.projectId);
+    if (!project) throw new Error("Destination project is unavailable");
+    return {
+      status: await broker.store.copy(from, await projectScope(project.projectRootPath), name),
+    };
   });
   server.handle(listVariables, async ({ workspaceId }, { paseo }) => {
     await start();

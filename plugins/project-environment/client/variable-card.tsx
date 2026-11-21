@@ -70,12 +70,13 @@ export function VariableCard({
   if (state.status === "success") messageStyle = styles.success;
   return (
     <View style={styles.card}>
-      <Text selectable style={styles.title}>
-        {name}
-      </Text>
-      {description ? <Text style={styles.description}>{description}</Text> : null}
+      {state.mode !== "view" ? (
+        <Text selectable style={styles.title}>
+          {name}
+        </Text>
+      ) : null}
       {state.mode === "view" ? (
-        <ValueControls target={target} name={name} theme={theme}>
+        <ValueControls target={target} name={name} description={description} theme={theme}>
           <ActionButton label="Replace" onPress={begin} theme={theme} />
           <ActionButton label="Remove" onPress={editor.confirmRemove} theme={theme} />
         </ValueControls>
