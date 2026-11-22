@@ -4,14 +4,14 @@ Paseo plugins maintained by [508.dev](https://508.dev). Each plugin is installed
 
 | Plugin                                             | What it does                                                      | Paseo requirement        |
 | -------------------------------------------------- | ----------------------------------------------------------------- | ------------------------ |
-| [Project environment](plugins/project-environment) | Search project variables and use current values in agent commands | >=0.13.2                 |
+| [Project environment](plugins/project-environment) | Search project variables and use current values in agent commands | >=0.13.0                 |
 | [Agent context](plugins/agent-context)             | Attach a bounded snapshot of another agent's conversation         | >=0.9.0                  |
 | [PR watcher](plugins/pr-watcher)                   | Follow GitHub checks/reviews and wake the associated agent        | >=0.16.0-beta.1, <0.17.0 |
 | [GitHub issue workflow](plugins/issue-workflow)    | Start workspaces from GitHub issues                               | >=0.16.0-beta.1          |
 | [Action inbox](plugins/action-inbox)               | Find agent requests and review-ready work across hosts            | >=0.16.0-beta.1          |
 | [Remote browser](plugins/remote-browser)           | Control a host browser or forward a local dev site                | >=0.16.0-beta.1          |
-| [Replies](plugins/replies)                         | Suggest replies you can edit before sending                       | >=0.16.0-beta.2          |
-| [Worktree include](plugins/worktreeinclude)        | Copy or symlink gitignored files into new worktrees               | >=0.10.3                 |
+| [Replies](plugins/replies)                         | Suggest replies you can edit before sending                       | >=0.16.0-beta.1          |
+| [Worktree include](plugins/worktreeinclude)        | Copy or symlink gitignored files into new worktrees               | >=0.8.0                  |
 
 ## Install
 
@@ -25,7 +25,7 @@ paseo plugin add git:508-dev/paseo-plugins:plugins/issue-workflow
 paseo plugin add git:508-dev/paseo-plugins:plugins/action-inbox
 paseo plugin add git:508-dev/paseo-plugins:plugins/remote-browser
 paseo plugin add git:508-dev/paseo-plugins:plugins/replies
-paseo plugin add git:508-dev/paseo-plugins:plugins/worktreeinclude
+paseo plugin add https://github.com/508-dev/paseo-plugins.git:plugins/worktreeinclude
 ```
 
 Read the selected plugin's README for setup, platform support, and data access. Some require beta SDK features on both the host and app. A collection checkout does not install every plugin.
