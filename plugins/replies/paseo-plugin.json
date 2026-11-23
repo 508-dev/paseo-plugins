@@ -1,9 +1,9 @@
 {
   "id": "replies-508",
+  "name": "Suggested replies",
   "media": [],
   "requirements": {
     "paseo": ">=0.16.0-beta.2"
   },
-  "name": "Replies (508-dev prototype)",
   "description": "Suggested next replies you can edit before sending, with a configurable Claude model."
 }

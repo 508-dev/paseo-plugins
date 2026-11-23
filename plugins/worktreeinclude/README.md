@@ -1,4 +1,4 @@
-# paseo-worktreeinclude (508-dev fork)
+# Worktree include
 
 A [Paseo](https://paseo.sh) plugin that copies gitignored files listed in `.worktreeinclude` into new git worktrees. Add `symlink <path>` to share a live file or directory instead.
 

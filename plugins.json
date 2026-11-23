@@ -7,7 +7,7 @@
     "package": "@508-dev/paseo-project-environment",
     "version": "0.2.1",
     "paseo": ">=0.13.2",
-    "registryId": null,
+    "registryId": "508-dev/project-environment",
     "source": {
       "repository": "https://github.com/508-dev/paseo-project-environment",
       "commit": "9d7e9c38f5b58f8972deda5ccb638bffa40f4b5e",
@@ -18,7 +18,7 @@
   {
     "slug": "agent-context",
     "id": "agent-context",
-    "name": "Agent Context",
+    "name": "Agent context",
     "description": "Attach bounded snapshots of existing Paseo agent conversations",
     "package": "@508-dev/paseo-agent-context",
     "version": "0.1.0",
@@ -38,7 +38,7 @@
     "description": "Watch GitHub pull requests and wake their Paseo agents when checks or reviews change",
     "package": "@508-dev/paseo-pr-watcher",
     "version": "0.1.0",
-    "paseo": ">=0.16.0-beta.1 <0.17.0",
+    "paseo": ">=0.16.0-beta.1",
     "registryId": null,
     "source": {
       "repository": "https://github.com/508-dev/paseo-pr-watcher",
@@ -50,7 +50,7 @@
   {
     "slug": "issue-workflow",
     "id": "github-issue-workflow",
-    "name": "Issue Workflow",
+    "name": "GitHub issue workflow",
     "description": "Start Paseo workspaces from GitHub issues",
     "package": "@508-dev/paseo-issue-workflow",
     "version": "0.1.0",
@@ -66,7 +66,7 @@
   {
     "slug": "action-inbox",
     "id": "action-inbox",
-    "name": "Action Inbox",
+    "name": "Action inbox",
     "description": "Show agent requests and review-ready work across connected hosts",
     "package": "@508-dev/paseo-action-inbox",
     "version": "0.1.0",
@@ -82,7 +82,7 @@
   {
     "slug": "remote-browser",
     "id": "remote-browser",
-    "name": "Remote Browser",
+    "name": "Remote browser",
     "description": "A working browser on the Paseo host, controlled from mobile or desktop",
     "package": "@508-dev/paseo-remote-browser",
     "version": "0.1.0",
@@ -98,7 +98,7 @@
   {
     "slug": "replies",
     "id": "replies-508",
-    "name": "Replies (508-dev prototype)",
+    "name": "Suggested replies",
     "description": "Suggested next replies you can edit before sending, with a configurable Claude model.",
     "package": "@508-dev/paseo-replies",
     "version": "0.2.0",
@@ -114,7 +114,7 @@
   {
     "slug": "worktreeinclude",
     "id": "paseo-worktreeinclude",
-    "name": "Worktreeinclude",
+    "name": "Worktree include",
     "description": "Paseo plugin that copies or symlinks gitignored files into new worktrees.",
     "package": "@508-dev/paseo-worktreeinclude",
     "version": "0.1.1",
