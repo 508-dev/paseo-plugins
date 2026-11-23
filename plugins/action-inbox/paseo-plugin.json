@@ -1,5 +1,6 @@
 {
   "id": "action-inbox",
+  "name": "Action inbox",
   "description": "Show agent requests and review-ready work across connected hosts",
   "requirements": {
     "paseo": ">=0.16.0-beta.1"
