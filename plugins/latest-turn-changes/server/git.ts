@@ -83,6 +83,7 @@ export async function readComparison(
     "-c",
     "core.quotePath=false",
     "diff",
+    "--no-relative",
     "--no-ext-diff",
     "--no-textconv",
     "--no-color",

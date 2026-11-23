@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import assert from "node:assert/strict";
@@ -47,6 +47,39 @@ test("approximate Git capture compares only the two snapshots and leaves the Git
     }
     assert.deepEqual(readFileSync(join(cwd, ".git", "index")), realIndex);
     assert.equal(git("for-each-ref"), "");
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("snapshot comparisons cover the whole repository from a subdirectory with diff.relative enabled", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "paseo-plugin-turn-relative-"));
+  const git = (...args: string[]) => execFileSync("git", args, { cwd, encoding: "utf8" });
+  const agentDirectory = join(cwd, "app");
+  const signal = new AbortController().signal;
+  try {
+    git("init", "-q");
+    git("config", "diff.relative", "true");
+    mkdirSync(agentDirectory);
+    writeFileSync(join(agentDirectory, "agent.txt"), "agent before\n");
+    writeFileSync(join(cwd, "shared.txt"), "shared before\n");
+    git("add", ".");
+    const before = git("write-tree").trim();
+
+    writeFileSync(join(agentDirectory, "agent.txt"), "agent after\n");
+    writeFileSync(join(cwd, "shared.txt"), "shared after\n");
+    git("add", ".");
+    const after = git("write-tree").trim();
+
+    const result = await readComparison(agentDirectory, before, after, signal);
+    assert.equal(result.kind, "ready");
+    assert.deepEqual(result.files, [
+      { status: "M", path: "app/agent.txt" },
+      { status: "M", path: "shared.txt" },
+    ]);
+    assert.match(result.patch, /diff --git a\/app\/agent\.txt b\/app\/agent\.txt/);
+    assert.match(result.patch, /diff --git a\/shared\.txt b\/shared\.txt/);
+    assert.match(result.patch, /\+shared after/);
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }
