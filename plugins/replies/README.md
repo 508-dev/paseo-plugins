@@ -1,4 +1,4 @@
-# Replies for Paseo
+# Suggested replies for Paseo
 
 A 508-dev prototype of suggested next replies. After an agent finishes, a **Replies** pill offers up to three choices. Selecting one fills the empty composer and focuses it so you can edit, then send normally. It never sends a suggestion automatically or replaces an existing draft.
 

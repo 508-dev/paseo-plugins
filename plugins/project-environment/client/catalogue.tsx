@@ -20,15 +20,17 @@ interface CatalogueScreenProps extends PluginScreenProps {
 }
 interface ProjectResultsProps {
   project: CatalogueProject;
+  hostId: string;
   theme: PluginScreenProps["theme"];
   openEditor: OpenEditor;
 }
 interface WorkspaceResultsProps {
   workspace: CatalogueProject["workspaces"][number];
+  hostId: string;
   openEditor: OpenEditor;
   theme: PluginScreenProps["theme"];
 }
-function WorkspaceResults({ workspace, openEditor, theme }: WorkspaceResultsProps) {
+function WorkspaceResults({ workspace, openEditor, theme, hostId }: WorkspaceResultsProps) {
   const { t } = useTranslation(messages);
   const open = useCallback(() => openEditor(workspace.id), [workspace.id, openEditor]);
   const target = useMemo(
@@ -55,12 +57,18 @@ function WorkspaceResults({ workspace, openEditor, theme }: WorkspaceResultsProp
         <ActionButton label={t("openVariables")} onPress={open} theme={theme} />
       </View>
       {workspace.variables.map((variable) => (
-        <VariableResult key={variable.name} {...variable} target={target} theme={theme} />
+        <VariableResult
+          key={variable.name}
+          {...variable}
+          target={target}
+          hostId={hostId}
+          theme={theme}
+        />
       ))}
     </View>
   );
 }
-function ProjectResults({ project, theme, openEditor }: ProjectResultsProps) {
+function ProjectResults({ project, theme, openEditor, hostId }: ProjectResultsProps) {
   const { t } = useTranslation(messages);
   const target = useMemo(
     () => ({ kind: "project" as const, scopeId: project.scopeId }),
@@ -82,12 +90,19 @@ function ProjectResults({ project, theme, openEditor }: ProjectResultsProps) {
       </Text>
       {project.variables.length ? <Text style={styles.detail}>{t("projectDefaults")}</Text> : null}
       {project.variables.map((variable) => (
-        <VariableResult key={variable.name} {...variable} target={target} theme={theme} />
+        <VariableResult
+          key={variable.name}
+          {...variable}
+          target={target}
+          hostId={hostId}
+          theme={theme}
+        />
       ))}
       {project.workspaces.map((workspace) => (
         <WorkspaceResults
           key={workspace.id}
           workspace={workspace}
+          hostId={hostId}
           openEditor={openEditor}
           theme={theme}
         />
@@ -103,15 +118,15 @@ function VariableResult({
   name,
   description,
   target,
+  hostId,
   theme,
 }: CatalogueProject["variables"][number] & {
   target: VariableTarget;
+  hostId: string;
   theme: PluginScreenProps["theme"];
 }) {
   const styles = useMemo(
     () => ({
-      name: { color: theme.colors.foreground, fontSize: 14, fontWeight: "600" as const },
-      detail: { color: theme.colors.foregroundMuted, fontSize: 13 },
       card: {
         padding: 16,
         gap: 10,
@@ -125,11 +140,13 @@ function VariableResult({
   );
   return (
     <View style={styles.card}>
-      <Text selectable style={styles.name}>
-        {name}
-      </Text>
-      {description ? <Text style={styles.detail}>{description}</Text> : null}
-      <ValueControls target={target} name={name} theme={theme} />
+      <ValueControls
+        target={target}
+        hostId={hostId}
+        name={name}
+        description={description}
+        theme={theme}
+      />
     </View>
   );
 }
@@ -224,6 +241,7 @@ export function VariableCatalogueScreen({ theme, layout, host, openEditor }: Cat
         <ProjectResults
           key={project.scopeId}
           project={project}
+          hostId={host.id}
           theme={theme}
           openEditor={openEditor}
         />

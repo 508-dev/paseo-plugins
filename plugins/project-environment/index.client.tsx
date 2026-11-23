@@ -8,6 +8,7 @@ import { SidebarRow } from "@getpaseo/plugin/client/ui";
 import { useCallback } from "react";
 import { VariableCatalogueScreen } from "./client/catalogue";
 import { EnvironmentPanel } from "./client/environment";
+import { addWorkspaceShortcuts } from "./client/workspace-shortcut";
 
 function CatalogueSidebarItem({ currentScreen, openScreen }: PluginSidebarItemProps) {
   const open = useCallback(() => openScreen({ screenId: "variables" }), [openScreen]);
@@ -59,5 +60,5 @@ export default function contribute(client: PluginClientContext) {
       openPanel("environment");
     },
   });
-  return () => {};
+  return addWorkspaceShortcuts(client);
 }

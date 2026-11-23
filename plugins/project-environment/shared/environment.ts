@@ -49,6 +49,29 @@ export const readVariableValue = defineRpc({
   output: z.object({ value: z.string() }).strict(),
 });
 
+const copyDestination = z.discriminatedUnion("kind", [
+  workspaceInput.extend({ kind: z.literal("workspace") }),
+  z.object({ kind: z.literal("project"), projectId: z.string().min(1) }),
+]);
+const destinationOption = z.object({
+  target: copyDestination,
+  label: z.string(),
+  directory: z.string(),
+});
+export const variableDestinations = defineRpc({
+  name: "environment.destinations",
+  input: z.object({}),
+  output: z.object({ destinations: z.array(destinationOption) }),
+});
+export const copyVariable = defineRpc({
+  name: "environment.copy",
+  input: z.object({ source: variableTarget, destination: copyDestination, name: variableName }),
+  output: z
+    .object({ status: z.enum(["copied", "exists", "same-scope", "missing", "full"]) })
+    .strict(),
+});
+export type CopyStatus = z.infer<typeof copyVariable.output>["status"];
+
 export const catalogueProject = z
   .object({
     scopeId,

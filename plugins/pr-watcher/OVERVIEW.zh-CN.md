@@ -2,4 +2,4 @@
 
 监视详情会显示状态、最近检查时间和已发送的跟进次数。插件把已有的失败和审查作为基线，只在之后出现变化时唤醒代理。两次跟进至少相隔十分钟，五次后暂停。如果无法确认是否已送达，插件会暂停自动发送，请你查看聊天记录后重试或标为已处理。关闭拉取请求会结束监视。
 
-需要 Paseo 0.16 系列且版本至少为 0.16.0-beta.1，应用和守护进程均须兼容。守护进程需要 Node、npm 和已登录且有仓库访问权限的 GitHub CLI。插件通过 `gh pr view` 读取状态、检查和审查。状态文件保存在 `$PASEO_HOME/plugins/pr-watcher-state.json`，未设置 `PASEO_HOME` 时使用 `~/.paseo/plugins/pr-watcher-state.json`。可用 `PASEO_PR_WATCHER_STATE_FILE` 修改路径。
+应用和守护进程均需 Paseo 0.16.0-beta.1 或更新版本。守护进程需要 Node、npm 和已登录且有仓库访问权限的 GitHub CLI。插件通过 `gh pr view` 读取状态、检查和审查。状态文件保存在 `$PASEO_HOME/plugins/pr-watcher-state.json`，未设置 `PASEO_HOME` 时使用 `~/.paseo/plugins/pr-watcher-state.json`。可用 `PASEO_PR_WATCHER_STATE_FILE` 修改路径。

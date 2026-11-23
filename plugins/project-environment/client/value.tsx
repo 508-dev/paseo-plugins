@@ -13,20 +13,23 @@ import { useTranslation, useRpc } from "@getpaseo/plugin/client";
 import { copyText } from "@getpaseo/plugin/client/ui";
 import { readVariableValue, type VariableTarget } from "../shared/environment";
 import { ActionButton } from "./action-button";
+import { CopyDestination } from "./copy-destination";
 import { VariableValueController } from "./value-controller";
 
 interface ValueControlsProps {
   target: VariableTarget;
+  hostId: string;
   name: string;
+  description: string;
   theme: PluginTheme;
-  disabled?: boolean;
   children?: ReactNode;
 }
 export function ValueControls({
   target,
+  hostId,
   name,
+  description,
   theme,
-  disabled = false,
   children,
 }: ValueControlsProps) {
   const { t } = useTranslation(messages);
@@ -51,9 +54,6 @@ export function ValueControls({
       controller.hide();
     };
   }, [controller]);
-  useEffect(() => {
-    if (disabled) controller.hide();
-  }, [controller, disabled]);
   const reveal = useCallback(() => {
     if (state.revealed !== null) controller.hide();
     else void controller.reveal();
@@ -73,34 +73,48 @@ export function ValueControls({
       detail: { color: theme.colors.foregroundMuted, fontSize: 12 },
       error: { color: theme.colors.statusDanger, fontSize: 12 },
       success: { color: theme.colors.statusSuccess, fontSize: 12 },
-      actions: {
+      title: {
+        color: theme.colors.foreground,
+        fontSize: 14,
+        fontWeight: "600" as const,
+        flexShrink: 1,
+        minWidth: 0,
+      },
+      heading: {
         flexDirection: "row" as const,
-        flexWrap: "wrap" as const,
-        gap: 8,
+        gap: 4,
         alignItems: "center" as const,
       },
     }),
     [theme],
   );
-  const busy = disabled || state.pending !== null;
+  const busy = state.pending !== null;
   let messageStyle = styles.detail;
   if (state.status === "error") messageStyle = styles.error;
   if (state.status === "success") messageStyle = styles.success;
-  let revealLabel = t("reveal");
-  if (state.revealed !== null) revealLabel = t("hide");
-  if (state.pending === "reveal") revealLabel = t("revealing");
+  const revealed = state.revealed !== null;
   return (
     <>
-      <View style={styles.actions}>
-        <ActionButton label={revealLabel} disabled={busy} onPress={reveal} theme={theme} />
+      <View style={styles.heading}>
+        <Text selectable style={styles.title}>
+          {name}
+        </Text>
         <ActionButton
-          label={state.pending === "copy" ? t("copying") : t("copy")}
+          label={t(revealed ? "hideValueFor" : "revealValueFor", { name })}
+          icon={revealed ? "EyeOff" : "Eye"}
+          disabled={busy}
+          onPress={reveal}
+          theme={theme}
+        />
+        <ActionButton
+          label={t("copyValueFor", { name })}
+          icon="Clipboard"
           disabled={busy}
           onPress={copy}
           theme={theme}
         />
-        {children}
       </View>
+      {description ? <Text style={styles.detail}>{description}</Text> : null}
       {state.revealed !== null ? (
         <Text selectable style={styles.value}>
           {state.revealed}
@@ -111,6 +125,9 @@ export function ValueControls({
           {t(state.message)}
         </Text>
       ) : null}
+      <CopyDestination name={name} source={target} hostId={hostId} theme={theme}>
+        {children}
+      </CopyDestination>
     </>
   );
 }

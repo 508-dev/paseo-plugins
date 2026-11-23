@@ -19,12 +19,12 @@ You can also paste that Git source into **Settings → Plugins → Plugin source
 ## Add your first variable
 
 1. Open a workspace in Paseo.
-2. Open the Command Center with **⌘K** on macOS or **Ctrl+K** on Windows/Linux, then choose **Project environment**.
+2. On mobile, tap **⋯ → Environment variables** in the workspace header. On desktop, select the key icon in the workspace header, or open the Command Center with **⌘K** on macOS or **Ctrl+K** on Windows/Linux and choose **Project environment**.
 3. Choose **Project defaults** to share the variable across the project's workspaces, or **Workspace variables** to keep it in the current workspace. Under **Add variable**, enter its name, description, and value. For example:
    - **Name:** `STRIPE_API_KEY`
    - **Description:** `Stripe test-mode key for reading customers`
    - **Value:** Paste your key into the value field. Choose **Show value** to check your input and **Hide value** to mask it again.
-4. Select **Add variable**. The panel confirms the addition and lists the name and description. Values stay hidden until you choose **Reveal** or **Copy**.
+4. Select **Add variable**. The panel confirms the addition and lists the name and description. Use the eye or clipboard next to the name to reveal or copy the saved value.
 
 Git worktrees of the same repository inherit the same project defaults. To override a default, add a variable with the same name under **Workspace variables**. A workspace can also define its own names. Removing a workspace override restores the project default on the next command. Existing saved variables are project defaults.
 
@@ -38,7 +38,9 @@ Results show project defaults and variables saved in individual active workspace
 
 ## Reveal or copy a value
 
-Choose **Reveal** on a saved variable to view its value, or **Copy** to copy it to your clipboard. These actions fetch only the selected value when clicked. Values do not enter the searchable catalogue or query cache. Revealed values hide after 30 seconds, when the app becomes inactive, or when the view closes. Copy shows a confirmation after the clipboard write succeeds.
+Tap the eye next to the variable name to reveal the value or the clipboard to copy it. These actions fetch only the selected value when clicked. Values do not enter the searchable catalogue or query cache. Revealed values hide after 30 seconds, when the app becomes inactive, or when the view closes. Copy shows a confirmation after the clipboard write succeeds.
+
+Choose **Copy to…** to save a copy in another project's defaults or a workspace's variables on the same host. Select the destination and confirm **Copy variable**. Paseo copies the name, description, and value on the host. If the destination already has the same name in that scope, it keeps its existing value.
 
 ## Ask an agent to use it
 
