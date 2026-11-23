@@ -85,12 +85,13 @@ export default function contribute(server: PluginServerContext) {
       destinations: [
         ...projects.projects.map((project) => ({
           target: { kind: "project" as const, projectId: project.projectId },
-          label: `${project.projectDisplayName} · Project defaults`,
+          label: project.projectDisplayName,
           directory: project.projectRootPath,
         })),
         ...workspaces.map((workspace) => ({
           target: { kind: "workspace" as const, workspaceId: workspace.id },
-          label: `${workspace.projectDisplayName} · ${workspace.name} · Workspace variables`,
+          label: workspace.name,
+          projectName: workspace.projectDisplayName,
           directory: workspace.workspaceDirectory,
         })),
       ].toSorted(
@@ -98,18 +99,23 @@ export default function contribute(server: PluginServerContext) {
       ),
     };
   });
-  server.handle(copyVariable, async ({ source, destination, name }, { paseo }) => {
+  server.handle(copyVariable, async ({ source, destination, name, overwrite }, { paseo }) => {
     await start();
     const from = await resolveSource(paseo, source);
     if (destination.kind === "workspace") {
       const workspace = await workspaceScope(await resolveProject(paseo, destination.workspaceId));
-      return { status: await broker.store.copy(from, workspace, name) };
+      return { status: await broker.store.copy(from, workspace, name, overwrite) };
     }
     const { projects } = await paseo.projects.list();
     const project = projects.find(({ projectId }) => projectId === destination.projectId);
     if (!project) throw new Error("Destination project is unavailable");
     return {
-      status: await broker.store.copy(from, await projectScope(project.projectRootPath), name),
+      status: await broker.store.copy(
+        from,
+        await projectScope(project.projectRootPath),
+        name,
+        overwrite,
+      ),
     };
   });
   server.handle(listVariables, async ({ workspaceId }, { paseo }) => {

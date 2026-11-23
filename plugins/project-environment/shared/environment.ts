@@ -56,6 +56,7 @@ const copyDestination = z.discriminatedUnion("kind", [
 const destinationOption = z.object({
   target: copyDestination,
   label: z.string(),
+  projectName: z.string().optional(),
   directory: z.string(),
 });
 export const variableDestinations = defineRpc({
@@ -65,9 +66,16 @@ export const variableDestinations = defineRpc({
 });
 export const copyVariable = defineRpc({
   name: "environment.copy",
-  input: z.object({ source: variableTarget, destination: copyDestination, name: variableName }),
+  input: z.object({
+    source: variableTarget,
+    destination: copyDestination,
+    name: variableName,
+    overwrite: z.boolean().default(false),
+  }),
   output: z
-    .object({ status: z.enum(["copied", "exists", "same-scope", "missing", "full"]) })
+    .object({
+      status: z.enum(["copied", "overwritten", "exists", "same-scope", "missing", "full"]),
+    })
     .strict(),
 });
 export type CopyStatus = z.infer<typeof copyVariable.output>["status"];

@@ -17,12 +17,29 @@ function CatalogueSidebarItem({ currentScreen, openScreen }: PluginSidebarItemPr
 }
 
 export default function contribute(client: PluginClientContext) {
+  const catalogueSearches = new Map<string, string>();
+
   function CatalogueScreen(props: PluginScreenProps) {
+    const hostId = props.host.id;
     const openEditor = useCallback(
       (workspaceId: string) => client.openPanel("environment", { workspaceId }),
       [],
     );
-    return <VariableCatalogueScreen key={props.host.id} {...props} openEditor={openEditor} />;
+    const saveSearch = useCallback(
+      (query: string) => {
+        catalogueSearches.set(hostId, query);
+      },
+      [hostId],
+    );
+    return (
+      <VariableCatalogueScreen
+        key={hostId}
+        {...props}
+        openEditor={openEditor}
+        initialSearch={catalogueSearches.get(hostId) ?? ""}
+        onSearchChange={saveSearch}
+      />
+    );
   }
   client.addScreen({ id: "variables", title: "Environment variables", Component: CatalogueScreen });
   client.addSidebarHeaderItem({

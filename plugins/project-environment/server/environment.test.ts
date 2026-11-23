@@ -172,7 +172,7 @@ test("Git worktrees inherit project defaults and can override them independently
   expect(filterVariableCatalogue(workspaceOnly.projects, "LOCAL_KEY")).toHaveLength(1);
 });
 
-test("copies across scopes without returning the value or overwriting a destination", async () => {
+test("copies across scopes and replaces an existing value only with explicit permission", async () => {
   const { scope: source, store } = await fixture();
   const { scope: destination } = await fixture();
   const local = await workspaceScope(destination);
@@ -188,10 +188,11 @@ test("copies across scopes without returning the value or overwriting a destinat
   expect(await store.copy(local, destination, variable.name)).toBe("exists");
   expect(await store.readValue(destination, variable.name)).toBe("fixture-default");
   expect(await store.copy(local, local, variable.name)).toBe("same-scope");
+  expect(await store.copy(local, local, variable.name, true)).toBe("same-scope");
   expect(await store.copy(source, destination, "MISSING_KEY")).toBe("missing");
-  await store.remove(destination, variable.name);
-  expect(await store.copy(local, destination, variable.name)).toBe("copied");
+  expect(await store.copy(local, destination, variable.name, true)).toBe("overwritten");
   expect(await store.read(destination)).toEqual([variable]);
+  expect(await store.read(local)).toEqual([variable]);
   expect(copyVariable.output.safeParse({ status: copied, value: variable.value }).success).toBe(
     false,
   );

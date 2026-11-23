@@ -40,7 +40,7 @@ Results show project defaults and variables saved in individual active workspace
 
 Tap the eye next to the variable name to reveal the value or the clipboard to copy it. These actions fetch only the selected value when clicked. Values do not enter the searchable catalogue or query cache. Revealed values hide after 30 seconds, when the app becomes inactive, or when the view closes. Copy shows a confirmation after the clipboard write succeeds.
 
-Choose **Copy to…** to save a copy in another project's defaults or a workspace's variables on the same host. Select the destination and confirm **Copy variable**. Paseo copies the name, description, and value on the host. If the destination already has the same name in that scope, it keeps its existing value.
+Choose **Copy to…**, select **Projects** or **Workspaces**, and search for a destination on the same host. Select a destination and confirm **Copy variable**. Paseo copies the name, description, and value on the host. If the destination already has that name, choose **Overwrite variable** to replace its value and description.
 
 ## Ask an agent to use it
 
