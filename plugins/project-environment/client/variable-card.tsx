@@ -1,3 +1,5 @@
+import { useTranslation } from "@getpaseo/plugin/client";
+import { messages } from "./messages";
 import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
 import { Text, View } from "react-native";
 import type { PluginTheme } from "@getpaseo/plugin";
@@ -24,6 +26,7 @@ export function VariableCard({
   save,
   remove,
 }: VariableCardProps) {
+  const { t } = useTranslation(messages);
   const [editor] = useState(() => new SavedVariableEditor(name, { save, remove }));
   const state = useSyncExternalStore(editor.subscribe, editor.getState);
   const pending = state.status === "pending";
@@ -76,15 +79,15 @@ export function VariableCard({
       {description ? <Text style={styles.description}>{description}</Text> : null}
       {state.mode === "view" ? (
         <ValueControls target={target} name={name} theme={theme}>
-          <ActionButton label="Replace" onPress={begin} theme={theme} />
-          <ActionButton label="Remove" onPress={editor.confirmRemove} theme={theme} />
+          <ActionButton label={t("replace")} onPress={begin} theme={theme} />
+          <ActionButton label={t("remove")} onPress={editor.confirmRemove} theme={theme} />
         </ValueControls>
       ) : null}
       {state.mode === "replace" ? (
         <>
           <Field
-            label="New value"
-            accessibilityLabel={`New value for ${name}`}
+            label={t("newValue")}
+            accessibilityLabel={t("newValueFor", { name })}
             value={state.value}
             onChangeText={setValue}
             theme={theme}
@@ -92,8 +95,8 @@ export function VariableCard({
             disabled={pending}
           />
           <Field
-            label="Description"
-            accessibilityLabel={`Description for ${name}`}
+            label={t("description")}
+            accessibilityLabel={t("descriptionFor", { name })}
             value={state.description}
             onChangeText={setDescription}
             theme={theme}
@@ -101,25 +104,33 @@ export function VariableCard({
           />
           <View style={styles.actions}>
             <ActionButton
-              label={pending ? "Saving…" : "Save replacement"}
+              label={pending ? t("saving") : t("saveReplacement")}
               onPress={submit}
               theme={theme}
               variant="primary"
               disabled={pending}
             />
-            <ActionButton label="Cancel" onPress={editor.cancel} theme={theme} disabled={pending} />
+            <ActionButton
+              label={t("cancel")}
+              onPress={editor.cancel}
+              theme={theme}
+              disabled={pending}
+            />
           </View>
         </>
       ) : null}
       {state.mode === "confirm-remove" ? (
         <View style={styles.confirmation}>
-          <Text style={styles.description}>
-            Remove this saved variable? Commands already running keep their value.
-          </Text>
+          <Text style={styles.description}>{t("confirmRemoveHint")}</Text>
           <View style={styles.actions}>
-            <ActionButton label="Cancel" onPress={editor.cancel} theme={theme} disabled={pending} />
             <ActionButton
-              label={pending ? "Removing…" : "Confirm remove"}
+              label={t("cancel")}
+              onPress={editor.cancel}
+              theme={theme}
+              disabled={pending}
+            />
+            <ActionButton
+              label={pending ? t("removing") : t("confirmRemove")}
               onPress={confirm}
               theme={theme}
               variant="destructive"
@@ -130,7 +141,7 @@ export function VariableCard({
       ) : null}
       {state.message ? (
         <Text accessibilityRole="alert" style={messageStyle}>
-          {state.message}
+          {state.message === "removed" ? t("removed", { name }) : t(state.message)}
         </Text>
       ) : null}
     </View>

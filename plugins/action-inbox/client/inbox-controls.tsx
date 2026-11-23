@@ -1,3 +1,5 @@
+import { useTranslation } from "@getpaseo/plugin/client";
+import { messages } from "./messages";
 import { useState, type ReactNode } from "react";
 import { Pressable, Text, View } from "react-native";
 import { Icon, Modal, TextInput } from "@getpaseo/plugin/client/ui";
@@ -98,6 +100,9 @@ export interface FilterOption {
 export function InboxFilter({
   title,
   allLabel,
+  selectedLabel,
+  filterTitle,
+  searchLabel,
   value,
   options,
   onChange,
@@ -106,26 +111,30 @@ export function InboxFilter({
 }: {
   title: string;
   allLabel: string;
+  selectedLabel: string;
+  filterTitle: string;
+  searchLabel: string;
   value: string | null;
   options: FilterOption[];
   onChange(value: string | null): void;
   theme: PluginTheme;
   compact: boolean;
 }) {
+  const { t, locale } = useTranslation(messages);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const selected = options.find((option) => option.value === value);
-  const label = selected?.label ?? (value ? `Selected ${title.toLowerCase()}` : allLabel);
+  const label = selected?.label ?? (value ? selectedLabel : allLabel);
   const choices = [{ value: "", label: allLabel }, ...options].filter((option) =>
     `${option.label} ${"description" in option ? option.description : ""}`
-      .toLowerCase()
-      .includes(query.toLowerCase()),
+      .toLocaleLowerCase(locale)
+      .includes(query.toLocaleLowerCase(locale)),
   );
   return (
     <>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${title}: ${label}`}
+        accessibilityLabel={t("filterLabel", { title, label })}
         accessibilityState={{ expanded: open }}
         onPress={() => {
           setQuery("");
@@ -150,11 +159,11 @@ export function InboxFilter({
         </Text>
         <Icon name="ChevronDown" size={14} color={theme.colors.foregroundMuted} />
       </Pressable>
-      <Modal title={`Filter by ${title.toLowerCase()}`} open={open} onOpenChange={setOpen}>
+      <Modal title={filterTitle} open={open} onOpenChange={setOpen}>
         <Modal.Content contentContainerStyle={{ padding: 12, gap: 4 }}>
           <TextInput
-            accessibilityLabel={`Search ${title.toLowerCase()}`}
-            placeholder={`Search ${title.toLowerCase()}`}
+            accessibilityLabel={searchLabel}
+            placeholder={searchLabel}
             value={query}
             onChangeText={setQuery}
             placeholderTextColor={theme.colors.foregroundMuted}
@@ -198,7 +207,9 @@ export function InboxFilter({
             </Pressable>
           ))}
           {choices.length === 0 ? (
-            <Text style={{ color: theme.colors.foregroundMuted, padding: 12 }}>No matches</Text>
+            <Text style={{ color: theme.colors.foregroundMuted, padding: 12 }}>
+              {t("noMatches")}
+            </Text>
           ) : null}
         </Modal.Content>
       </Modal>

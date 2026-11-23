@@ -1,6 +1,7 @@
+import { messages } from "./messages";
 import { useCallback, useMemo, useState } from "react";
 import { Text, View } from "react-native";
-import { type PluginScreenProps, useRpc } from "@getpaseo/plugin/client";
+import { useTranslation, type PluginScreenProps, useRpc } from "@getpaseo/plugin/client";
 import { ScrollView } from "@getpaseo/plugin/client/ui";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -28,6 +29,7 @@ interface WorkspaceResultsProps {
   theme: PluginScreenProps["theme"];
 }
 function WorkspaceResults({ workspace, openEditor, theme }: WorkspaceResultsProps) {
+  const { t } = useTranslation(messages);
   const open = useCallback(() => openEditor(workspace.id), [workspace.id, openEditor]);
   const target = useMemo(
     () => ({ kind: "workspace" as const, workspaceId: workspace.id }),
@@ -50,7 +52,7 @@ function WorkspaceResults({ workspace, openEditor, theme }: WorkspaceResultsProp
     <View style={styles.section}>
       <View style={styles.row}>
         <Text style={styles.name}>{workspace.name}</Text>
-        <ActionButton label="Open variables" onPress={open} theme={theme} />
+        <ActionButton label={t("openVariables")} onPress={open} theme={theme} />
       </View>
       {workspace.variables.map((variable) => (
         <VariableResult key={variable.name} {...variable} target={target} theme={theme} />
@@ -59,6 +61,7 @@ function WorkspaceResults({ workspace, openEditor, theme }: WorkspaceResultsProp
   );
 }
 function ProjectResults({ project, theme, openEditor }: ProjectResultsProps) {
+  const { t } = useTranslation(messages);
   const target = useMemo(
     () => ({ kind: "project" as const, scopeId: project.scopeId }),
     [project.scopeId],
@@ -75,9 +78,9 @@ function ProjectResults({ project, theme, openEditor }: ProjectResultsProps) {
     <View style={styles.section}>
       <Text style={styles.title}>{project.name}</Text>
       <Text selectable style={styles.detail}>
-        {project.directory ?? "The original project location is unavailable."}
+        {project.directory ?? t("directoryUnavailable")}
       </Text>
-      {project.variables.length ? <Text style={styles.detail}>Project defaults</Text> : null}
+      {project.variables.length ? <Text style={styles.detail}>{t("projectDefaults")}</Text> : null}
       {project.variables.map((variable) => (
         <VariableResult key={variable.name} {...variable} target={target} theme={theme} />
       ))}
@@ -90,9 +93,7 @@ function ProjectResults({ project, theme, openEditor }: ProjectResultsProps) {
         />
       ))}
       {!project.workspaces.length ? (
-        <Text style={styles.detail}>
-          No active workspace. Saved variables are still available here.
-        </Text>
+        <Text style={styles.detail}>{t("noActiveWorkspace")}</Text>
       ) : null}
     </View>
   );
@@ -133,6 +134,7 @@ function VariableResult({
   );
 }
 export function VariableCatalogueScreen({ theme, layout, host, openEditor }: CatalogueScreenProps) {
+  const { t } = useTranslation(messages);
   const read = useRpc(variableCatalogue);
   const catalogue = useQuery({
     queryKey: ["project-environment-catalogue", host.id],
@@ -173,11 +175,8 @@ export function VariableCatalogueScreen({ theme, layout, host, openEditor }: Cat
       project.workspaces.reduce((local, workspace) => local + workspace.variables.length, 0),
     0,
   );
-  const variableLabel = count === 1 ? "variable" : "variables";
-  const projectLabel = projects.length === 1 ? "project" : "projects";
-  let emptyText =
-    "No saved variables on this host yet. Add one from Project environment in a workspace.";
-  if (catalogue.data?.projects.length) emptyText = "No names or descriptions match your search.";
+  let emptyText = t("emptyCatalogue");
+  if (catalogue.data?.projects.length) emptyText = t("noSearchResults");
   return (
     <ScrollView
       style={styles.screen}
@@ -185,43 +184,41 @@ export function VariableCatalogueScreen({ theme, layout, host, openEditor }: Cat
       keyboardShouldPersistTaps="handled"
     >
       <View style={styles.introduction}>
-        <Text style={styles.title}>Environment variables</Text>
-        <Text style={styles.detail}>
-          Find variables across projects and workspaces on {host.label}. Search matches names and
-          descriptions only.
-        </Text>
+        <Text style={styles.title}>{t("variables")}</Text>
+        <Text style={styles.detail}>{t("catalogueIntro", { host: host.label })}</Text>
       </View>
       <Field
-        label="Search variables"
+        label={t("searchVariables")}
         value={query}
-        placeholder="Name or description"
+        placeholder={t("nameOrDescription")}
         onChangeText={setQuery}
         theme={theme}
       />
       <View style={styles.toolbar}>
         <Text style={styles.detail}>
-          {count} {variableLabel} in {projects.length} {projectLabel}
+          {t("catalogueCount", {
+            variables: t("variableCount", { count }),
+            projects: t("projectCount", { count: projects.length }),
+          })}
         </Text>
         <ActionButton
-          label={catalogue.isFetching ? "Refreshing…" : "Refresh"}
+          label={catalogue.isFetching ? t("refreshing") : t("refresh")}
           disabled={catalogue.isFetching}
           onPress={refresh}
           theme={theme}
         />
       </View>
-      {catalogue.isPending ? <Text style={styles.detail}>Loading saved variables…</Text> : null}
+      {catalogue.isPending ? <Text style={styles.detail}>{t("loadingSaved")}</Text> : null}
       {catalogue.isError ? (
         <Text accessibilityRole="alert" style={styles.detail}>
-          Could not load saved variables. Use Refresh to try again.
+          {t("catalogueError")}
         </Text>
       ) : null}
       {catalogue.isSuccess && !projects.length ? (
         <Text style={styles.detail}>{emptyText}</Text>
       ) : null}
       {catalogue.data && catalogue.data.unavailableDirectories > 0 ? (
-        <Text style={styles.detail}>
-          Some project locations are unavailable. Their saved variables are still included.
-        </Text>
+        <Text style={styles.detail}>{t("unavailableDirectories")}</Text>
       ) : null}
       {projects.map((project) => (
         <ProjectResults
@@ -231,9 +228,7 @@ export function VariableCatalogueScreen({ theme, layout, host, openEditor }: Cat
           openEditor={openEditor}
         />
       ))}
-      <Text style={styles.detail}>
-        Values stay hidden until you choose Reveal or Copy. Revealed values hide after 30 seconds.
-      </Text>
+      <Text style={styles.detail}>{t("cataloguePrivacy")}</Text>
     </ScrollView>
   );
 }

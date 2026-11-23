@@ -1,3 +1,4 @@
+import { messages } from "./messages";
 import {
   useCallback,
   useEffect,
@@ -8,7 +9,7 @@ import {
 } from "react";
 import { AppState, Text, View } from "react-native";
 import type { PluginTheme } from "@getpaseo/plugin";
-import { useRpc } from "@getpaseo/plugin/client";
+import { useTranslation, useRpc } from "@getpaseo/plugin/client";
 import { copyText } from "@getpaseo/plugin/client/ui";
 import { readVariableValue, type VariableTarget } from "../shared/environment";
 import { ActionButton } from "./action-button";
@@ -28,6 +29,7 @@ export function ValueControls({
   disabled = false,
   children,
 }: ValueControlsProps) {
+  const { t } = useTranslation(messages);
   const read = useRpc(readVariableValue);
   const [controller] = useState(
     () =>
@@ -84,15 +86,15 @@ export function ValueControls({
   let messageStyle = styles.detail;
   if (state.status === "error") messageStyle = styles.error;
   if (state.status === "success") messageStyle = styles.success;
-  let revealLabel = "Reveal";
-  if (state.revealed !== null) revealLabel = "Hide";
-  if (state.pending === "reveal") revealLabel = "Revealing…";
+  let revealLabel = t("reveal");
+  if (state.revealed !== null) revealLabel = t("hide");
+  if (state.pending === "reveal") revealLabel = t("revealing");
   return (
     <>
       <View style={styles.actions}>
         <ActionButton label={revealLabel} disabled={busy} onPress={reveal} theme={theme} />
         <ActionButton
-          label={state.pending === "copy" ? "Copying…" : "Copy"}
+          label={state.pending === "copy" ? t("copying") : t("copy")}
           disabled={busy}
           onPress={copy}
           theme={theme}
@@ -106,7 +108,7 @@ export function ValueControls({
       ) : null}
       {state.message ? (
         <Text accessibilityRole="alert" style={messageStyle}>
-          {state.message}
+          {t(state.message)}
         </Text>
       ) : null}
     </>

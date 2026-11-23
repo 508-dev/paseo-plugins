@@ -1,6 +1,12 @@
+import { messages } from "./messages";
 import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
 import { Text, View } from "react-native";
-import { type PluginWorkspacePanelProps, useRpc, useWorkspace } from "@getpaseo/plugin/client";
+import {
+  useTranslation,
+  type PluginWorkspacePanelProps,
+  useRpc,
+  useWorkspace,
+} from "@getpaseo/plugin/client";
 import { ScrollView } from "@getpaseo/plugin/client/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { z } from "zod";
@@ -48,6 +54,7 @@ function ScopedEnvironment({
   showProject,
   showWorkspace,
 }: ScopedEnvironmentProps) {
+  const { t } = useTranslation(messages);
   const project = useWorkspace(workspaceId, (workspace) => workspace.projectDisplayName);
   const workspaceName = useWorkspace(workspaceId, (workspace) => workspace.name);
   const isProject = scope === "project";
@@ -78,7 +85,7 @@ function ScopedEnvironment({
     async (name: string) => {
       setNotice("");
       await remove({ workspaceId, scope, name });
-      setNotice(`${name} removed.`);
+      setNotice(name);
       await invalidate();
     },
     [remove, workspaceId, scope, invalidate],
@@ -142,17 +149,17 @@ function ScopedEnvironment({
       keyboardShouldPersistTaps="handled"
     >
       <View style={styles.heading}>
-        <Text style={styles.title}>Environment</Text>
+        <Text style={styles.title}>{t("environment")}</Text>
         <View style={styles.actions}>
           <ActionButton
-            label="Project defaults"
+            label={t("projectDefaults")}
             theme={theme}
             onPress={showProject}
             variant={isProject ? "primary" : "outline"}
             selected={isProject}
           />
           <ActionButton
-            label="Workspace variables"
+            label={t("workspaceVariables")}
             theme={theme}
             onPress={showWorkspace}
             variant={isProject ? "outline" : "primary"}
@@ -161,25 +168,27 @@ function ScopedEnvironment({
         </View>
         <Text style={styles.detail}>
           {isProject
-            ? `Shared across workspaces in ${project ?? "this project"}.`
-            : `Saved for ${workspaceName ?? "this workspace"} only. Add a name from Project defaults to override it here. Removing the override restores the project value.`}
+            ? t("projectScope", { project: project ?? t("thisProject") })
+            : t("workspaceScope", { workspace: workspaceName ?? t("thisWorkspace") })}
         </Text>
       </View>
       <View style={styles.section}>
-        <Text style={styles.subtitle}>Saved variables</Text>
+        <Text style={styles.subtitle}>{t("savedVariables")}</Text>
         {notice ? (
           <Text accessibilityRole="alert" style={styles.success}>
-            {notice}
+            {t("removed", { name: notice })}
           </Text>
         ) : null}
-        {variables.isPending ? <Text style={styles.detail}>Loading…</Text> : null}
+        {variables.isPending ? <Text style={styles.detail}>{t("loading")}</Text> : null}
         {variables.isError ? (
           <>
-            <Text style={styles.error}>Could not load variables.</Text>
-            <ActionButton label="Retry" onPress={retry} theme={theme} />
+            <Text style={styles.error}>{t("loadError")}</Text>
+            <ActionButton label={t("retry")} onPress={retry} theme={theme} />
           </>
         ) : null}
-        {savedVariables?.length === 0 ? <Text style={styles.detail}>No variables yet.</Text> : null}
+        {savedVariables?.length === 0 ? (
+          <Text style={styles.detail}>{t("noVariables")}</Text>
+        ) : null}
         {target &&
           savedVariables?.map((variable) => (
             <VariableCard
@@ -194,9 +203,9 @@ function ScopedEnvironment({
           ))}
       </View>
       <View style={styles.form}>
-        <Text style={styles.subtitle}>Add variable</Text>
+        <Text style={styles.subtitle}>{t("addVariable")}</Text>
         <Field
-          label="Variable name"
+          label={t("variableName")}
           value={form.name}
           placeholder="STRIPE_API_KEY"
           onChangeText={setName}
@@ -204,15 +213,15 @@ function ScopedEnvironment({
           disabled={pending}
         />
         <Field
-          label="Description"
+          label={t("description")}
           value={form.description}
-          placeholder="What this variable is used for"
+          placeholder={t("purpose")}
           onChangeText={setDescription}
           theme={theme}
           disabled={pending}
         />
         <Field
-          label="Value"
+          label={t("value")}
           value={form.value}
           secure
           onChangeText={setValue}
@@ -221,7 +230,7 @@ function ScopedEnvironment({
         />
         <View style={styles.actions}>
           <ActionButton
-            label={pending ? "Adding…" : "Add variable"}
+            label={pending ? t("adding") : t("addVariable")}
             onPress={submit}
             theme={theme}
             variant="primary"
@@ -230,14 +239,13 @@ function ScopedEnvironment({
         </View>
         {form.message ? (
           <Text accessibilityRole="alert" style={messageStyle}>
-            {form.message}
+            {typeof form.message === "string"
+              ? t(form.message)
+              : t("added", { name: form.message.name })}
           </Text>
         ) : null}
       </View>
-      <Text style={styles.detail}>
-        Values stay hidden until you choose Reveal or Copy. Commands using a variable can access it
-        and call APIs with it.
-      </Text>
+      <Text style={styles.detail}>{t("environmentPrivacy")}</Text>
     </ScrollView>
   );
 }

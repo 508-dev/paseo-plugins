@@ -10,5 +10,11 @@
     "docs/qa/project-defaults-desktop.png",
     "docs/qa/workspace-override-compact.png",
     "docs/qa/scoped-search-desktop.png"
-  ]
+  ],
+  "translations": {
+    "zh-CN": {
+      "name": "项目环境",
+      "description": "保存项目变量，无需重启会话即可在代理命令中使用。"
+    }
+  }
 }

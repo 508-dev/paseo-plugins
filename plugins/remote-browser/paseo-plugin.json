@@ -14,5 +14,12 @@
       "--no-audit",
       "--no-fund"
     ]
-  ]
+  ],
+  "name": "Remote browser",
+  "translations": {
+    "zh-CN": {
+      "name": "远程浏览器",
+      "description": "在手机或桌面端操控运行于 Paseo 主机的浏览器。"
+    }
+  }
 }

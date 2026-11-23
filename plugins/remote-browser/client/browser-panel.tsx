@@ -1,4 +1,10 @@
-import { useRpc, useSubscription, type PluginWorkspacePanelProps } from "@getpaseo/plugin/client";
+import { messages } from "./messages";
+import {
+  useTranslation,
+  useRpc,
+  useSubscription,
+  type PluginWorkspacePanelProps,
+} from "@getpaseo/plugin/client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Image, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import {
@@ -12,11 +18,14 @@ import {
 import { bindBrowserSurface, frameSource } from "./web";
 
 export function BrowserPanel({ workspaceId, theme, layout }: PluginWorkspacePanelProps) {
+  const { t } = useTranslation(messages);
   const call = useRpc(browserRpc);
   const acknowledge = useRpc(browserAck);
   const [address, setAddress] = useState("");
-  const [title, setTitle] = useState("Host browser");
-  const [error, setError] = useState("");
+  const [title, setTitle] = useState("");
+  const [error, setError] = useState<
+    { key: "lag" | "frameError" } | { key: "inputError" | "ackError"; detail: string } | null
+  >(null);
   const [picture, setPicture] = useState<{
     uri: string;
     sequence: number;
@@ -39,12 +48,12 @@ export function BrowserPanel({ workspaceId, theme, layout }: PluginWorkspacePane
         pending.current >= 128 &&
         !((input.action === "key" || input.action === "pointer") && input.phase === "up")
       ) {
-        setError("Input connection is falling behind; reopen the panel");
+        setError({ key: "lag" });
         return;
       }
       pending.current++;
       void call({ ...input, workspaceId })
-        .catch((cause: unknown) => setError(String(cause)))
+        .catch((cause: unknown) => setError({ key: "inputError", detail: String(cause) }))
         .finally(() => pending.current--);
     },
     [call, workspaceId],
@@ -69,14 +78,14 @@ export function BrowserPanel({ workspaceId, theme, layout }: PluginWorkspacePane
           setPicture({ uri: source.uri, sequence: frame.sequence, streamId: streamId.current });
         } else {
           streamId.current = event.streamId;
-          setTitle(event.title || "Host browser");
+          setTitle(event.title);
           if (!editingAddress.current) setAddress(event.url === "about:blank" ? "" : event.url);
         }
       }}
     >
       {(status) => (
         <View style={styles.screen}>
-          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.title}>{title || t("browser")}</Text>
           <View style={styles.row}>
             <TextInput
               style={styles.address}
@@ -91,30 +100,36 @@ export function BrowserPanel({ workspaceId, theme, layout }: PluginWorkspacePane
               onSubmitEditing={() => send({ action: "navigate", url: address })}
               autoCapitalize="none"
               autoCorrect={false}
-              placeholder="localhost:3000 or a URL"
+              placeholder={t("url")}
               placeholderTextColor={theme.colors.foregroundMuted}
-              accessibilityLabel="Browser address"
+              accessibilityLabel={t("address")}
             />
             <Action
-              label="Go"
+              label={t("go")}
               onPress={() => send({ action: "navigate", url: address })}
               styles={styles}
             />
             {(["back", "forward", "reload"] as const).map((action) => (
               <Action
                 key={action}
-                label={action}
+                label={t(action)}
                 onPress={() => send({ action })}
                 styles={styles}
               />
             ))}
           </View>
           <View style={styles.row}>
-            <Text style={styles.muted}>{error || status}</Text>
+            <Text style={styles.muted}>
+              {error
+                ? "detail" in error
+                  ? t(error.key, { detail: error.detail })
+                  : t(error.key)
+                : status}
+            </Text>
             <Action
-              label="Reconnect"
+              label={t("reconnect")}
               onPress={() => {
-                setError("");
+                setError(null);
                 retry((value) => value + 1);
               }}
               styles={styles}
@@ -123,7 +138,7 @@ export function BrowserPanel({ workspaceId, theme, layout }: PluginWorkspacePane
           <View
             ref={setSurface}
             style={styles.viewport}
-            accessibilityLabel="Interactive host browser"
+            accessibilityLabel={t("viewport")}
             onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
             onStartShouldSetResponder={() => Platform.OS !== "web"}
             onResponderGrant={(event) => {
@@ -188,12 +203,14 @@ export function BrowserPanel({ workspaceId, theme, layout }: PluginWorkspacePane
                   void acknowledge({
                     streamId: picture.streamId,
                     sequence: picture.sequence,
-                  }).catch((cause: unknown) => setError(String(cause)));
+                  }).catch((cause: unknown) =>
+                    setError({ key: "ackError", detail: String(cause) }),
+                  );
                 }}
-                onError={() => setError("Frame could not be displayed; reconnect to retry")}
+                onError={() => setError({ key: "frameError" })}
               />
             ) : (
-              <Text style={styles.muted}>Connecting to host Chrome…</Text>
+              <Text style={styles.muted}>{t("connectingChrome")}</Text>
             )}
           </View>
           {Platform.OS !== "web" ? (
@@ -201,9 +218,9 @@ export function BrowserPanel({ workspaceId, theme, layout }: PluginWorkspacePane
               <TextInput
                 style={styles.address}
                 value={keyboardText}
-                placeholder="Tap to type in the focused page field"
+                placeholder={t("keyboardPlaceholder")}
                 placeholderTextColor={theme.colors.foregroundMuted}
-                accessibilityLabel="Host browser keyboard"
+                accessibilityLabel={t("keyboard")}
                 autoCorrect={false}
                 autoCapitalize="none"
                 onFocus={() => setKeyboardText("")}
@@ -226,7 +243,7 @@ export function BrowserPanel({ workspaceId, theme, layout }: PluginWorkspacePane
                 onSubmitEditing={() => send({ action: "key", key: "Enter", phase: "press" })}
               />
               <Action
-                label={drag ? "Drag mode" : "Scroll mode"}
+                label={drag ? t("dragMode") : t("scrollMode")}
                 onPress={() => setDrag((value) => !value)}
                 styles={styles}
               />
@@ -240,9 +257,7 @@ export function BrowserPanel({ workspaceId, theme, layout }: PluginWorkspacePane
               ))}
             </View>
           ) : (
-            <Text style={styles.muted}>
-              Click the page to focus. Type, scroll, drag, or paste directly.
-            </Text>
+            <Text style={styles.muted}>{t("webHint")}</Text>
           )}
         </View>
       )}
@@ -259,9 +274,18 @@ function Stream({
   onEvent: (event: Uint8Array | { streamId: string; url: string; title: string }) => void;
   children: (status: string) => React.ReactNode;
 }) {
+  const { t } = useTranslation(messages);
   const subscription = useSubscription(browserStream, { workspaceId }, onEvent);
   return children(
-    subscription.status === "error" ? subscription.error.message : subscription.status,
+    subscription.status === "error"
+      ? t("streamError", { detail: subscription.error.message })
+      : t(
+          subscription.status === "live"
+            ? "connected"
+            : subscription.status === "closed"
+              ? "disconnected"
+              : "connecting",
+        ),
   );
 }
 function Action({

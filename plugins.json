@@ -22,7 +22,7 @@
     "description": "Attach bounded snapshots of existing Paseo agent conversations",
     "package": "@508-dev/paseo-agent-context",
     "version": "0.1.0",
-    "paseo": ">=0.9.0",
+    "paseo": ">=0.13.0",
     "registryId": "508-dev/agent-context",
     "source": {
       "repository": "https://github.com/508-dev/paseo-agent-context",

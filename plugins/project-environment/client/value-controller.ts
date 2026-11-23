@@ -5,7 +5,7 @@ interface ValueActions {
 interface ValueState {
   revealed: string | null;
   pending: "reveal" | "copy" | null;
-  message: string;
+  message: "" | "autoHide" | "revealError" | "copied" | "copyError";
   status: "idle" | "success" | "error";
 }
 
@@ -42,7 +42,7 @@ export class VariableValueController {
       this.publish({
         revealed: value,
         pending: null,
-        message: "Hides automatically after 30 seconds.",
+        message: "autoHide",
         status: "success",
       });
       this.expiry = setTimeout(this.hide, 30000);
@@ -50,7 +50,7 @@ export class VariableValueController {
       if (generation === this.generation)
         this.publish({
           pending: null,
-          message: "Could not reveal this value. Try again.",
+          message: "revealError",
           status: "error",
         });
     }
@@ -64,12 +64,12 @@ export class VariableValueController {
       if (generation !== this.generation) return;
       await this.actions.copy(value);
       if (generation === this.generation)
-        this.publish({ pending: null, message: "Copied to clipboard.", status: "success" });
+        this.publish({ pending: null, message: "copied", status: "success" });
     } catch {
       if (generation === this.generation)
         this.publish({
           pending: null,
-          message: "Could not copy this value. Try again.",
+          message: "copyError",
           status: "error",
         });
     }

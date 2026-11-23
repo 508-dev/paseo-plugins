@@ -14,5 +14,12 @@
       "--no-audit",
       "--no-fund"
     ]
-  ]
+  ],
+  "name": "GitHub issue workflow",
+  "translations": {
+    "zh-CN": {
+      "name": "GitHub 议题工作流",
+      "description": "从 GitHub 议题创建 Paseo 工作区。"
+    }
+  }
 }
