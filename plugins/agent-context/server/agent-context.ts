@@ -1,5 +1,10 @@
-import type { PluginAttachmentSearchPayload, RpcInput } from "@getpaseo/plugin";
-import { searchAgentTranscriptsRpc } from "../shared/agent-context";
+import type { PluginAttachmentSearchPayload, RpcInput, RpcOutput } from "@getpaseo/plugin";
+import {
+  EXCERPT_AGENT_LIMIT,
+  EXCERPT_TIMELINE_LIMIT,
+  searchAgentTranscriptsRpc,
+  searchTranscriptExcerptsRpc,
+} from "../shared/agent-context";
 
 const DIRECTORY_PAGE_SIZE = 200;
 const MAX_AGENTS_SCANNED = 1_000;
@@ -9,8 +14,7 @@ const MAX_TIMELINE_ITEMS_SCANNED = 5_000;
 const MAX_TIMELINE_PAGES_SCANNED = 25;
 const MAX_TRANSCRIPT_BYTES = 128 * 1024;
 const PARENT_AGENT_ID_LABEL = "paseo.parent-agent-id";
-const PLUGIN_DOCUMENTATION_URL =
-  "https://github.com/508-dev/paseo-agent-context";
+const PLUGIN_DOCUMENTATION_URL = "https://github.com/508-dev/paseo-agent-context";
 
 interface AgentSummary {
   id: string;
@@ -136,8 +140,9 @@ function compareStableText(left: string, right: string): number {
 }
 
 async function findAgents(
-  dependencies: AgentContextSearchDependencies,
+  listAgents: AgentContextSearchDependencies["listAgents"],
   query: string,
+  limit = MAX_SEARCH_RESULTS,
 ): Promise<AgentDirectoryEntry[]> {
   const normalizedQuery = normalizeSearchValue(query);
   const ranked: RankedAgent[] = [];
@@ -146,7 +151,7 @@ async function findAgents(
   let scanned = 0;
 
   while (scanned < MAX_AGENTS_SCANNED) {
-    const page = await dependencies.listAgents({
+    const page = await listAgents({
       sort: [{ key: "updated_at", direction: "desc" }],
       page: {
         limit: Math.min(DIRECTORY_PAGE_SIZE, MAX_AGENTS_SCANNED - scanned),
@@ -164,7 +169,7 @@ async function findAgents(
     // The directory is already newest-first, so an empty picker query can stop
     // once it has enough eligible defaults. Typed searches still scan all
     // bounded pages because a better match may be older.
-    if (!normalizedQuery && ranked.length >= MAX_SEARCH_RESULTS) break;
+    if (!normalizedQuery && ranked.length >= limit) break;
 
     const nextCursor = page.pageInfo.nextCursor?.trim();
     if (!nextCursor || nextCursor === cursor || page.entries.length === 0) break;
@@ -172,13 +177,13 @@ async function findAgents(
   }
 
   return ranked
-    .sort(
+    .toSorted(
       (left, right) =>
         left.score - right.score ||
         updatedAtMs(right.entry) - updatedAtMs(left.entry) ||
         compareStableText(left.entry.agent.id, right.entry.agent.id),
     )
-    .slice(0, MAX_SEARCH_RESULTS)
+    .slice(0, limit)
     .map(({ entry }) => entry);
 }
 
@@ -440,7 +445,7 @@ function createAgentTranscriptSearch(dependencies: AgentContextSearchDependencie
   return async ({
     query,
   }: RpcInput<typeof searchAgentTranscriptsRpc>): Promise<PluginAttachmentSearchPayload> => {
-    const candidates = await findAgents(dependencies, query);
+    const candidates = await findAgents(dependencies.listAgents, query);
     const capturedAt = dependencies.now();
     const snapshots = await mapWithConcurrency(candidates, 2, async (entry) => {
       const timeline = await readTimelineSnapshot(dependencies, entry.agent.id);
@@ -499,4 +504,79 @@ export async function searchAgentTranscripts(
     now: () => new Date(),
   });
   return search(input);
+}
+
+type ExcerptSearchResult = RpcOutput<typeof searchTranscriptExcerptsRpc>;
+
+function excerptWindow(text: string, start: number, end: number): string {
+  // Slice only the small display window and keep both edges on code-point boundaries.
+  if (start > 0 && /[\uDC00-\uDFFF]/.test(text.charAt(start))) start -= 1;
+  if (/[\uDC00-\uDFFF]/.test(text.charAt(end))) end += 1;
+  return `${start > 0 ? "…" : ""}${text.slice(start, end)}${end < text.length ? "…" : ""}`;
+}
+
+function findExcerpt(items: TimelinePage["entries"], pattern: RegExp): string | null {
+  const messages = items.flatMap(({ item }) => {
+    const chunk = transcriptChunk(item);
+    return chunk && chunk.label !== "Tool" ? [chunk] : [];
+  });
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const match = pattern.exec(messages[index].text);
+    if (!match) continue;
+    return messages
+      .slice(Math.max(0, index - 2), index + 3)
+      .map((chunk) =>
+        renderChunk({
+          ...chunk,
+          text:
+            chunk === messages[index]
+              ? excerptWindow(
+                  chunk.text,
+                  Math.max(0, match.index - 420),
+                  match.index + match[0].length + 420,
+                )
+              : excerptWindow(chunk.text, 0, 420),
+        }),
+      )
+      .join("\n\n");
+  }
+  return null;
+}
+
+export async function searchTranscriptExcerpts(
+  { query }: RpcInput<typeof searchTranscriptExcerptsRpc>,
+  { paseo }: AgentContextHandlerContext,
+): Promise<ExcerptSearchResult> {
+  const pattern = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "iu");
+  const candidates = await findAgents(
+    (options) => paseo.agents.list(options),
+    "",
+    EXCERPT_AGENT_LIMIT,
+  );
+  const results = await mapWithConcurrency(candidates, 3, async (entry) => {
+    const page = await paseo.agents.ref(entry.agent.id).timeline.refetch({
+      direction: "tail",
+      limit: EXCERPT_TIMELINE_LIMIT,
+      projection: "projected",
+    });
+    if (page.error || page.staleCursor) throw new Error("Transcript unavailable");
+    const text = findExcerpt(page.entries, pattern);
+    if (!text) return null;
+    return {
+      id: entry.agent.id,
+      identifier: shortAgentId(entry.agent.id),
+      title: singleLine(entry.agent.title, 160) ?? `Agent ${shortAgentId(entry.agent.id)}`,
+      subtitle: subtitle(entry),
+      url: PLUGIN_DOCUMENTATION_URL,
+      text,
+      resourceType: "agent transcript excerpt",
+      contextKind: "chat_history" as const,
+    };
+  });
+  return {
+    items: results
+      .flatMap((result) => (result.status === "fulfilled" && result.value ? [result.value] : []))
+      .slice(0, MAX_SEARCH_RESULTS),
+    unavailable: results.filter((result) => result.status === "rejected").length,
+  };
 }

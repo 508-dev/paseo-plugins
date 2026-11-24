@@ -2,7 +2,7 @@ import type { RpcInput, RpcOutput } from "@getpaseo/plugin";
 import type { PluginServerContext } from "@getpaseo/plugin/server";
 import { describe, expect, it } from "vitest";
 import contribute from "./index.server";
-import { searchAgentTranscriptsRpc } from "./shared/agent-context";
+import { searchAgentTranscriptsRpc, searchTranscriptExcerptsRpc } from "./shared/agent-context";
 
 const MAX_EXPECTED_TRANSCRIPT_BYTES = 128 * 1024;
 interface TimelinePage {
@@ -119,26 +119,36 @@ function dependencies(input: {
   };
 }
 
-function registeredSearchHandler(): SearchHandler {
-  let search: SearchHandler | undefined;
+type ExcerptHandler = (
+  input: RpcInput<typeof searchTranscriptExcerptsRpc>,
+  context: SearchContext,
+) => Promise<RpcOutput<typeof searchTranscriptExcerptsRpc>>;
+
+function registeredSearchHandlers() {
+  const handlers = new Map<string, unknown>();
   contribute({
     handle(contract, handler) {
-      if (contract.name !== searchAgentTranscriptsRpc.name) {
-        throw new Error(`Unexpected RPC registration: ${contract.name}`);
-      }
-      search = handler as unknown as SearchHandler;
+      handlers.set(contract.name, handler);
     },
   } as PluginServerContext);
-  if (!search) throw new Error("Agent transcript search handler was not registered");
-  return search;
+  return handlers;
 }
 
-const searchAgentTranscripts = registeredSearchHandler();
+const handlers = registeredSearchHandlers();
+const searchAgentTranscripts = handlers.get(searchAgentTranscriptsRpc.name) as SearchHandler;
+const searchTranscriptExcerpts = handlers.get(searchTranscriptExcerptsRpc.name) as ExcerptHandler;
 
 async function invokeSearch(source: ReturnType<typeof dependencies>, query: string) {
   const input = searchAgentTranscriptsRpc.input.parse({ query });
   const output = await searchAgentTranscripts(input, source.context);
   return searchAgentTranscriptsRpc.output.parse(output);
+}
+
+async function invokeExcerptSearch(source: ReturnType<typeof dependencies>, query: string) {
+  const input = searchTranscriptExcerptsRpc.input.parse({ query });
+  return searchTranscriptExcerptsRpc.output.parse(
+    await searchTranscriptExcerpts(input, source.context),
+  );
 }
 
 describe("agent transcript attachment source", () => {
@@ -390,5 +400,84 @@ describe("agent transcript attachment source", () => {
       "agent-4",
     ]);
     expect(listCalls).toBe(1);
+  });
+});
+
+describe("transcript excerpt search", () => {
+  it("reports no match when only reasoning and tool output contain the query", async () => {
+    const source = dependencies({
+      entries: [entry("agent")],
+      timeline: [
+        { type: "user_message", text: "Summarize the last turn." },
+        { type: "reasoning", text: "Private note: amber receipt." },
+        { type: "tool_call", detail: { type: "shell", output: "Found amber receipt." } },
+      ],
+    });
+
+    expect(await invokeExcerptSearch(source, "amber receipt")).toEqual({
+      items: [],
+      unavailable: 0,
+    });
+  });
+
+  it("finds literal text absent from metadata and returns a bounded preview around the match", async () => {
+    const source = dependencies({
+      entries: [entry("checkout", { title: "Checkout", workspaceName: "payments" })],
+      timeline: [
+        { type: "user_message", text: "Outside the selected excerpt" },
+        { type: "assistant_message", text: "First nearby reply." },
+        { type: "user_message", text: "Show the next batch." },
+        {
+          type: "assistant_message",
+          text: `${"😀".repeat(600)} Retry [TX+] here. ${"x".repeat(700)}`,
+        },
+        { type: "reasoning", text: "Hidden reasoning" },
+        { type: "tool_call", detail: { type: "shell", output: "Private tool output" } },
+        { type: "user_message", text: "Thanks, keep that finding." },
+      ],
+    });
+
+    const result = await invokeExcerptSearch(source, " [tx+] ");
+    expect(result.unavailable).toBe(0);
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).toMatchObject({
+      title: "Checkout",
+      subtitle: "payments · Paseo · codex",
+      resourceType: "agent transcript excerpt",
+      contextKind: "chat_history",
+    });
+    const text = result.items[0].text;
+    expect(text).toContain("[User] Show the next batch.");
+    expect(text).toContain("Retry [TX+] here.");
+    expect(text).toContain("[User] Thanks, keep that finding.");
+    expect(text).not.toMatch(/Outside the selected excerpt|Hidden reasoning|Private tool output/);
+    expect(text).not.toMatch(/[\uD800-\uDFFF]/u);
+    expect(new TextEncoder().encode(text).byteLength).toBeLessThan(6_000);
+  });
+
+  it("reports unavailable transcripts while keeping successful results", async () => {
+    const source = dependencies({
+      entries: [
+        entry("archived", { archivedAt: "2026-09-10T00:00:00.000Z" }),
+        entry("child", { parentAgentId: "parent" }),
+        entry("available"),
+        entry("deleted"),
+      ],
+      fetchTimeline: async (agentId) => {
+        if (agentId === "deleted") throw new Error("Agent not found");
+        return {
+          epoch: "epoch-1",
+          staleCursor: false,
+          hasOlder: false,
+          startCursor: null,
+          entries: [{ item: { type: "user_message", text: "Original transcript" } }],
+          error: null,
+        };
+      },
+    });
+
+    const result = await invokeExcerptSearch(source, "original transcript");
+    expect(result.items.map(({ id }) => id)).toEqual(["available"]);
+    expect(result.unavailable).toBe(1);
   });
 });
