@@ -32,14 +32,14 @@ See the [project defaults](docs/qa/project-defaults-desktop.png) and [workspace 
 
 ## Paste variables in bulk
 
-Choose **Project defaults** or **Workspace variables**, then select **Paste variables** under **Add variable**. Paste one assignment per line and choose **Add variables**.
+Choose **Project defaults** or **Workspace variables**, then select **Paste variables** under **Add variable**. Paste one assignment per line. Review the new and existing names before saving.
 
 ```dotenv
 ERPNEXT_API_SECRET=example
 ERPNEXT_BASE_URL=https://example.com
 ```
 
-Blank lines and lines beginning with `#` are skipped. Everything after the first `=` is saved literally, including quotes, spaces, and additional equals signs. Pasted text is visible in the editor. If a line is invalid or a name already exists in the selected scope, the entire batch is rejected. Use **Replace** to update an existing value.
+Blank lines and lines beginning with `#` are skipped. Everything after the first `=` is saved literally, including quotes, spaces, and additional equals signs. Pasted text is visible in the editor. Matching names in the selected scope are overwritten and keep their descriptions. Check **Protect existing values** to block the batch until you remove any matching names from the paste. Invalid lines and duplicate names within the paste block the whole batch.
 
 ## Find variables across projects
 

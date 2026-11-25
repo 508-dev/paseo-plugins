@@ -10,7 +10,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { z } from "zod";
 import { EnvironmentBroker } from "./broker";
 import { EnvironmentStore, projectScope, workspaceScope } from "./store";
-import { parseBulkVariables } from "./bulk-paste";
+import { parseBulkVariables } from "../shared/bulk-paste";
 import { execute, redact } from "./execute";
 import { buildVariableCatalogue } from "./catalogue";
 import {
@@ -670,9 +670,24 @@ test("bulk add rejects a conflicting batch atomically and can add workspace over
   ];
   await store.save(scope, saved);
 
-  expect(await store.addMany(scope, additions)).toMatchObject({ status: "rejected" });
+  expect(await store.saveMany(scope, additions, [])).toMatchObject({ status: "rejected" });
   expect(await store.read(scope)).toEqual([saved]);
-  expect(await store.addMany(workspace, additions)).toEqual({ status: "added", count: 2 });
+  expect(await store.saveMany(workspace, additions, [])).toEqual({
+    status: "saved",
+    added: 2,
+    updated: 0,
+  });
   expect(await store.read(workspace)).toEqual([additions[1], additions[0]]);
   expect(await store.read(scope)).toEqual([saved]);
+
+  expect(await store.saveMany(scope, additions, ["BASE_URL"])).toMatchObject({
+    status: "rejected",
+  });
+  expect(await store.read(scope)).toEqual([saved]);
+  expect(await store.saveMany(scope, additions, ["API_SECRET"])).toEqual({
+    status: "saved",
+    added: 1,
+    updated: 1,
+  });
+  expect(await store.read(scope)).toEqual([{ ...saved, value: "override" }, additions[0]]);
 });

@@ -12,7 +12,7 @@ import {
   copyVariable,
   type VariableTarget,
 } from "./shared/environment";
-import { parseBulkVariables } from "./server/bulk-paste";
+import { parseBulkVariables } from "./shared/bulk-paste";
 import { EnvironmentBroker, toolInstructions } from "./server/broker";
 import { buildVariableCatalogue, readWorkspaceDirectory } from "./server/catalogue";
 import { projectScope, workspaceScope } from "./server/store";
@@ -139,14 +139,15 @@ export default function contribute(server: PluginServerContext) {
     );
     return {};
   });
-  server.handle(addVariables, async ({ workspaceId, scope, text }, { paseo }) => {
+  server.handle(addVariables, async ({ workspaceId, scope, text, overwriteNames }, { paseo }) => {
     const parsed = parseBulkVariables(text);
     if ("message" in parsed) return { status: "rejected", message: parsed.message } as const;
     await start();
     const project = await resolveProject(paseo, workspaceId);
-    return broker.store.addMany(
+    return broker.store.saveMany(
       scope === "workspace" ? await workspaceScope(project) : project,
       parsed.variables,
+      overwriteNames,
     );
   });
   server.handle(removeVariable, async ({ workspaceId, scope, name }, { paseo }) => {

@@ -74,9 +74,10 @@ function ScopedEnvironment({
   }, []);
   const closeBulk = useCallback(() => setBulk(false), []);
   const completeBulk = useCallback(
-    (count: number) => {
+    (added: number, updated: number) => {
       setBulk(false);
-      setNotice(`${count} ${count === 1 ? "variable" : "variables"} added.`);
+      const changes = [added ? `${added} added` : "", updated ? `${updated} updated` : ""];
+      setNotice(`Variables saved. ${changes.filter(Boolean).join(", ")}.`);
       void invalidate();
     },
     [invalidate],
@@ -216,7 +217,9 @@ function ScopedEnvironment({
             workspaceId={workspaceId}
             scope={scope}
             theme={theme}
-            onAdded={completeBulk}
+            savedVariables={savedVariables}
+            onSaved={completeBulk}
+            refreshSaved={invalidate}
             onCancel={closeBulk}
           />
         ) : (
