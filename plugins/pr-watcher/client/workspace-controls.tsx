@@ -1,7 +1,9 @@
+import { messages } from "./messages.js";
 import type {
   PluginButton,
   PluginButtonRegistration,
   PluginClientContext,
+  PluginText,
 } from "@getpaseo/plugin/client";
 import type { PaseoAgent, PaseoWorkspace } from "@getpaseo/client";
 import type { z } from "zod";
@@ -14,18 +16,19 @@ type Watch = z.infer<typeof watchSchema>;
 function watchButton(
   watches: Watch[],
   Content: ReturnType<typeof createWatchPopover>,
-): PluginButton {
+): PluginButton<PluginText> {
   const active = watches.filter((watch) => watch.status !== "closed");
   const urls = new Set(active.map((watch) => watch.url));
-  let label = "Watch PR";
+  let label = messages.message("watch");
   if (urls.size === 1) {
     const watch = active[0];
-    label = `Watching #${watch.number}`;
-    if (active.every((item) => item.status === "paused")) label = `Watch paused · #${watch.number}`;
+    label = messages.message("watchingNumber", { number: watch.number });
+    if (active.every((item) => item.status === "paused"))
+      label = messages.message("pausedNumber", { number: watch.number });
     if (active.some((item) => item.status === "uncertain"))
-      label = `Review delivery · #${watch.number}`;
+      label = messages.message("uncertainNumber", { number: watch.number });
   }
-  if (urls.size > 1) label = `Watching ${urls.size} PRs`;
+  if (urls.size > 1) label = messages.message("watchingCount", { count: urls.size });
   return {
     title: label,
     label,
@@ -36,8 +39,8 @@ function watchButton(
 
 export function contributeWorkspaceControls(client: PluginClientContext) {
   const Content = createWatchPopover(client);
-  const headers = new Map<string, PluginButtonRegistration>();
-  const pills = new Map<string, PluginButtonRegistration>();
+  const headers = new Map<string, PluginButtonRegistration<PluginText>>();
+  const pills = new Map<string, PluginButtonRegistration<PluginText>>();
   const agents = new Map<string, PaseoAgent>();
   let watches: Watch[] = [];
   let stopped = false;
@@ -139,7 +142,10 @@ export function contributeWorkspaceControls(client: PluginClientContext) {
     } catch {
       if (!stopped) {
         for (const button of [...headers.values(), ...pills.values()]) {
-          button.update({ title: "PR watch status unavailable", label: "PR watch unavailable" });
+          button.update({
+            title: messages.message("statusUnavailable"),
+            label: messages.message("unavailable"),
+          });
         }
       }
     } finally {

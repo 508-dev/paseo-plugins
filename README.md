@@ -5,7 +5,7 @@ Paseo plugins maintained by [508.dev](https://508.dev). Each plugin is installed
 | Plugin                                             | What it does                                                      | Paseo requirement |
 | -------------------------------------------------- | ----------------------------------------------------------------- | ----------------- |
 | [Project environment](plugins/project-environment) | Search project variables and use current values in agent commands | >=0.13.2          |
-| [Agent context](plugins/agent-context)             | Attach a bounded snapshot of another agent's conversation         | >=0.9.0           |
+| [Agent context](plugins/agent-context)             | Attach a bounded snapshot of another agent's conversation         | >=0.13.0          |
 | [PR watcher](plugins/pr-watcher)                   | Follow GitHub checks/reviews and wake the associated agent        | >=0.16.0-beta.1   |
 | [GitHub issue workflow](plugins/issue-workflow)    | Start workspaces from GitHub issues                               | >=0.16.0-beta.1   |
 | [Action inbox](plugins/action-inbox)               | Find agent requests and review-ready work across hosts            | >=0.16.0-beta.1   |
@@ -31,6 +31,10 @@ paseo plugin add git:508-dev/paseo-plugins:plugins/worktreeinclude
 ```
 
 Read the selected plugin's README for setup, platform support, and data access. Some require beta SDK features on both the host and app. A collection checkout does not install every plugin.
+
+## Languages
+
+Plugin interfaces follow the Paseo app language and fall back to English. This collection bundles Simplified Chinese, Spanish, Japanese, Korean, and Traditional Chinese (Taiwan). Traditional Chinese requires a Paseo client that exposes `zh-TW` as an app language. Registry listings include Simplified Chinese overviews.
 
 ## Existing installations and registry listings
 

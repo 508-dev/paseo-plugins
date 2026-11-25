@@ -1,0 +1,17 @@
+{
+  "issue": "GitHub 이슈",
+  "openIssue": "GitHub 이슈 열기",
+  "attachIssue": "GitHub 이슈 첨부",
+  "searchIssues": "번호 또는 제목으로 이슈 검색",
+  "loading": "불러오는 중…",
+  "loadError": "연결된 이슈를 불러오지 못했습니다: {{detail}}",
+  "noIssue": "이 작업공간에 연결된 GitHub 이슈가 없습니다.",
+  "branch": "브랜치: {{name}}",
+  "detached": "분리된 HEAD",
+  "pullRequest": "풀 리퀘스트",
+  "pullRequestError": "풀 리퀘스트를 불러오지 못했습니다: {{detail}}",
+  "noPullRequest": "이 브랜치에 해당하는 풀 리퀘스트가 없습니다.",
+  "open": "열림",
+  "closed": "닫힘",
+  "merged": "병합됨"
+}

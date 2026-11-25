@@ -1,0 +1,17 @@
+{
+  "issue": "GitHub issue",
+  "openIssue": "Open GitHub issue",
+  "attachIssue": "Attach GitHub issue",
+  "searchIssues": "Search issues by number or title",
+  "loading": "Loading…",
+  "loadError": "Could not load the linked issue: {{detail}}",
+  "noIssue": "No GitHub issue is linked to this workspace.",
+  "branch": "Branch: {{name}}",
+  "detached": "Detached HEAD",
+  "pullRequest": "Pull request",
+  "pullRequestError": "Could not load the pull request: {{detail}}",
+  "noPullRequest": "No pull request found for this branch.",
+  "open": "Open",
+  "closed": "Closed",
+  "merged": "Merged"
+}

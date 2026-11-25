@@ -1,4 +1,4 @@
-import { defineAttachmentSource, defineRpc } from "@getpaseo/plugin";
+import { defineRpc } from "@getpaseo/plugin";
 import { z } from "zod";
 
 export const issueSchema = z.object({
@@ -23,15 +23,6 @@ export const searchIssuesRpc = defineRpc({
   name: "github_issues.search",
   input: z.object({ query: z.string().max(200), projectId: z.string().optional() }),
   output: z.object({ items: z.array(issueSchema) }),
-});
-
-export const issueAttachments = defineAttachmentSource({
-  id: "github-issues",
-  title: "GitHub issue",
-  icon: "CircleDot",
-  pickerTitle: "Attach GitHub issue",
-  searchPlaceholder: "Search issues by number or title",
-  search: searchIssuesRpc,
 });
 
 export const ISSUE_METADATA_KEY = "github-issue-workflow.issue";

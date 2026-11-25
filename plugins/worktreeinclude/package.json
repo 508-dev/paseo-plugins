@@ -20,6 +20,7 @@
   "files": [
     "paseo-plugin.json",
     "OVERVIEW.md",
+    "OVERVIEW.*.md",
     "index.server.ts",
     "server/"
   ],

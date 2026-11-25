@@ -1,0 +1,17 @@
+{
+  "issue": "Incidencia de GitHub",
+  "openIssue": "Abrir incidencia de GitHub",
+  "attachIssue": "Adjuntar incidencia de GitHub",
+  "searchIssues": "Buscar incidencias por número o título",
+  "loading": "Cargando…",
+  "loadError": "No se pudo cargar la incidencia vinculada: {{detail}}",
+  "noIssue": "Este espacio de trabajo no tiene una incidencia de GitHub vinculada.",
+  "branch": "Rama: {{name}}",
+  "detached": "HEAD separado",
+  "pullRequest": "Solicitud de cambios",
+  "pullRequestError": "No se pudo cargar la solicitud de cambios: {{detail}}",
+  "noPullRequest": "No se encontró ninguna solicitud de cambios para esta rama.",
+  "open": "Abierta",
+  "closed": "Cerrada",
+  "merged": "Fusionada"
+}

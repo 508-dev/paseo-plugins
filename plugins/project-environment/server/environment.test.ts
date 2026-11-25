@@ -523,7 +523,7 @@ test("values are fetched only by explicit actions and Copy reads the current val
   await controller.copy();
   expect(copied).toEqual(["private-2"]);
   expect(JSON.stringify(controller.getState())).not.toContain("private-");
-  expect(controller.getState().message).toBe("Copied to clipboard.");
+  expect(controller.getState().message).toBe("copied");
   controller.hide();
 });
 
@@ -547,7 +547,7 @@ test("hiding a value cancels a late reveal and errors do not expose credentials"
     },
   });
   await failing.copy();
-  expect(failing.getState().message).toContain("Could not copy");
+  expect(failing.getState().message).toBe("copyError");
   expect(JSON.stringify(failing.getState())).not.toContain("private-copy-value");
 });
 
@@ -575,7 +575,7 @@ test("replacement stays in its own card and gives local success feedback", async
   ]);
   expect(replacing.getState().mode).toBe("view");
   expect(replacing.getState().status).toBe("success");
-  expect(replacing.getState().message).toContain("Value updated");
+  expect(replacing.getState().message).toBe("updated");
   expect(JSON.stringify(replacing.getState())).not.toContain("replacement-private-value");
   expect(adding.getState().name).toBe("UNRELATED_NEW_KEY");
   expect(adding.getState().value).toBe("new-draft-value");
@@ -608,7 +608,7 @@ test("Cancel clears a replacement and removal requires a confirmation in that ca
   editor.confirmRemove();
   await editor.remove();
   expect(removals).toBe(1);
-  expect(editor.getState().message).toBe("API_KEY removed.");
+  expect(editor.getState().message).toBe("removed");
 });
 
 test("a failed replacement clears its value and leaves an actionable error in that card", async () => {
@@ -623,7 +623,7 @@ test("a failed replacement clears its value and leaves an actionable error in th
   await editor.save();
   expect(editor.getState().mode).toBe("replace");
   expect(editor.getState().status).toBe("error");
-  expect(editor.getState().message).toContain("Re-enter the value");
+  expect(editor.getState().message).toBe("updateError");
   expect(JSON.stringify(editor.getState())).not.toContain("private-replacement");
 });
 
@@ -638,7 +638,7 @@ test("the Add form directs existing names to their own Replace action", async ()
   editor.set("value", "draft-value");
   await editor.save(["API_KEY"]);
   expect(saves).toBe(0);
-  expect(editor.getState().message).toContain("Use Replace on its card");
+  expect(editor.getState().message).toBe("alreadyExists");
 });
 
 test("bulk paste preserves literal values and reports invalid lines without their contents", () => {

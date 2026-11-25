@@ -20,7 +20,7 @@ export interface InboxCard {
 
 export interface PermissionAction {
   id: string;
-  label: string;
+  label?: string;
   behavior: "allow" | "deny";
   variant?: "primary" | "secondary" | "danger";
 }
@@ -172,11 +172,11 @@ export function questionPreview(permission: Permission): QuestionPreview[] {
   return result;
 }
 
-export function permissionSummary(permission: Permission): string {
+export function permissionSummary(permission: Permission): string | null {
   if (permission.detail?.type === "shell") return permission.detail.command;
   if (permission.description) return permission.description;
   if (typeof permission.input?.command === "string") return permission.input.command;
-  return permission.title || "Open the agent to review this request";
+  return permission.title || null;
 }
 
 export function permissionDetails(permission: Permission): string {
@@ -207,9 +207,18 @@ export function directActions(permission: Permission): PermissionAction[] {
     }));
   }
   return [
-    { id: "reject", label: "Deny", behavior: "deny", variant: "danger" },
-    { id: "accept", label: "Allow", behavior: "allow", variant: "primary" },
+    { id: "reject", behavior: "deny", variant: "danger" },
+    { id: "accept", behavior: "allow", variant: "primary" },
   ];
+}
+
+export class InboxResponseError extends Error {
+  constructor(
+    readonly key: "missingRequest" | "resolvedRequest" | "changedRequest" | "reviewRequired",
+    message: string,
+  ) {
+    super(message);
+  }
 }
 
 /** Re-read the permission before a mutation so a stale inbox card cannot answer a newer request. */
@@ -218,20 +227,29 @@ export async function respondToCard(
   action: PermissionAction,
   getAgent: () => Pick<PaseoAgentHandle, "refresh" | "respondToPermission">,
 ): Promise<void> {
-  if (!card.permission) throw new Error("This card has no permission request");
+  if (!card.permission)
+    throw new InboxResponseError("missingRequest", "This card has no permission request");
   const agent = getAgent();
   const current = await agent.refresh();
   const request = current?.agent.pendingPermissions.find(
     (entry) => entry.id === card.permission?.id,
   );
-  if (!request) throw new Error("This request is no longer pending");
+  if (!request)
+    throw new InboxResponseError("resolvedRequest", "This request is no longer pending");
   if (permissionDetails(request) !== permissionDetails(card.permission)) {
-    throw new Error("This request changed. Refresh the inbox and review it again.");
+    throw new InboxResponseError(
+      "changedRequest",
+      "This request changed. Refresh the inbox and review it again.",
+    );
   }
   const allowed = directActions(request).find(
     (candidate) => candidate.id === action.id && candidate.behavior === action.behavior,
   );
-  if (!allowed) throw new Error("This request now needs review in the agent view");
+  if (!allowed)
+    throw new InboxResponseError(
+      "reviewRequired",
+      "This request now needs review in the agent view",
+    );
   await agent.respondToPermission({
     requestId: request.id,
     response:
