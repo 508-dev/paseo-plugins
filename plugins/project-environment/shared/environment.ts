@@ -32,6 +32,18 @@ export const saveVariable = defineRpc({
   input: editScope.extend({ variable: variableInput }),
   output: z.object({}),
 });
+export const bulkPasteLimit = 64 * 1024;
+export const addVariables = defineRpc({
+  name: "environment.add-variables",
+  input: workspaceInput.extend({
+    scope: z.enum(["project", "workspace"]),
+    text: z.string().max(bulkPasteLimit),
+  }),
+  output: z.discriminatedUnion("status", [
+    z.object({ status: z.literal("added"), count: z.number().int().positive() }),
+    z.object({ status: z.literal("rejected"), message: z.string() }),
+  ]),
+});
 export const removeVariable = defineRpc({
   name: "environment.remove",
   input: editScope.extend({ name: variableName }),

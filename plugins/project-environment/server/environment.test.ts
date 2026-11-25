@@ -10,6 +10,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { z } from "zod";
 import { EnvironmentBroker } from "./broker";
 import { EnvironmentStore, projectScope, workspaceScope } from "./store";
+import { parseBulkVariables } from "./bulk-paste";
 import { execute, redact } from "./execute";
 import { buildVariableCatalogue } from "./catalogue";
 import {
@@ -638,4 +639,40 @@ test("the Add form directs existing names to their own Replace action", async ()
   await editor.save(["API_KEY"]);
   expect(saves).toBe(0);
   expect(editor.getState().message).toContain("Use Replace on its card");
+});
+
+test("bulk paste preserves literal values and reports invalid lines without their contents", () => {
+  expect(
+    parseBulkVariables(
+      "# Example\r\n\r\nAPI_SECRET=abc==#literal\r\nBASE_URL =https://example.test\r\n",
+    ),
+  ).toEqual({
+    variables: [
+      { name: "API_SECRET", value: "abc==#literal", description: "" },
+      { name: "BASE_URL", value: "https://example.test", description: "" },
+    ],
+  });
+  expect(parseBulkVariables("VALID=first\nmalformed-sensitive-text")).toEqual({
+    message: "Line 2: use an uppercase NAME=value assignment.",
+  });
+  expect(parseBulkVariables("API_SECRET=first\nAPI_SECRET=second")).toEqual({
+    message: "Line 2: API_SECRET appears more than once.",
+  });
+});
+
+test("bulk add rejects a conflicting batch atomically and can add workspace overrides", async () => {
+  const { scope, store } = await fixture();
+  const workspace = await workspaceScope(scope);
+  const saved = { name: "API_SECRET", value: "original", description: "Keep this" };
+  const additions = [
+    { name: "BASE_URL", value: "https://example.test", description: "" },
+    { name: "API_SECRET", value: "override", description: "" },
+  ];
+  await store.save(scope, saved);
+
+  expect(await store.addMany(scope, additions)).toMatchObject({ status: "rejected" });
+  expect(await store.read(scope)).toEqual([saved]);
+  expect(await store.addMany(workspace, additions)).toEqual({ status: "added", count: 2 });
+  expect(await store.read(workspace)).toEqual([additions[1], additions[0]]);
+  expect(await store.read(scope)).toEqual([saved]);
 });

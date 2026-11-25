@@ -4,6 +4,7 @@ import path from "node:path";
 import {
   listVariables,
   saveVariable,
+  addVariables,
   removeVariable,
   readVariableValue,
   variableCatalogue,
@@ -11,6 +12,7 @@ import {
   copyVariable,
   type VariableTarget,
 } from "./shared/environment";
+import { parseBulkVariables } from "./server/bulk-paste";
 import { EnvironmentBroker, toolInstructions } from "./server/broker";
 import { buildVariableCatalogue, readWorkspaceDirectory } from "./server/catalogue";
 import { projectScope, workspaceScope } from "./server/store";
@@ -136,6 +138,16 @@ export default function contribute(server: PluginServerContext) {
       variable,
     );
     return {};
+  });
+  server.handle(addVariables, async ({ workspaceId, scope, text }, { paseo }) => {
+    const parsed = parseBulkVariables(text);
+    if ("message" in parsed) return { status: "rejected", message: parsed.message } as const;
+    await start();
+    const project = await resolveProject(paseo, workspaceId);
+    return broker.store.addMany(
+      scope === "workspace" ? await workspaceScope(project) : project,
+      parsed.variables,
+    );
   });
   server.handle(removeVariable, async ({ workspaceId, scope, name }, { paseo }) => {
     await start();

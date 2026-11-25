@@ -171,6 +171,32 @@ export class EnvironmentStore {
     });
   }
 
+  async addMany(scope: StorageScope, additions: Variable[]) {
+    return this.enqueue(async () => {
+      const variables = await this.read(scope);
+      const names = new Set(variables.map(({ name }) => name));
+      for (const { name } of additions) {
+        if (names.has(name))
+          return {
+            status: "rejected",
+            message: `${name} already exists in this scope. Remove it from the paste and use Replace to update it.`,
+          } as const;
+        names.add(name);
+      }
+      if (variables.length + additions.length > 256) {
+        return {
+          status: "rejected",
+          message: "This scope can have at most 256 variables.",
+        } as const;
+      }
+      await this.write(
+        scope,
+        [...variables, ...additions].toSorted((a, b) => a.name.localeCompare(b.name)),
+      );
+      return { status: "added", count: additions.length } as const;
+    });
+  }
+
   async remove(scope: StorageScope, name: string): Promise<void> {
     return this.change(scope, (variables) => variables.filter((entry) => entry.name !== name));
   }

@@ -12,6 +12,7 @@ import {
 } from "../shared/environment";
 import { VariableCard } from "./variable-card";
 import { ActionButton } from "./action-button";
+import { BulkEditor } from "./bulk-editor";
 import { Field } from "./field";
 import { EnvironmentEditor } from "./editor";
 
@@ -66,6 +67,20 @@ function ScopedEnvironment({
       queryClient.invalidateQueries({ queryKey: ["project-environment-catalogue"] }),
     ]);
   }, [queryClient]);
+  const [bulk, setBulk] = useState(false);
+  const openBulk = useCallback(() => {
+    setNotice("");
+    setBulk(true);
+  }, []);
+  const closeBulk = useCallback(() => setBulk(false), []);
+  const completeBulk = useCallback(
+    (count: number) => {
+      setBulk(false);
+      setNotice(`${count} ${count === 1 ? "variable" : "variables"} added.`);
+      void invalidate();
+    },
+    [invalidate],
+  );
   const saveExisting = useCallback(
     async (variable: z.infer<typeof variableInput>) => {
       setNotice("");
@@ -195,45 +210,63 @@ function ScopedEnvironment({
           ))}
       </View>
       <View style={styles.form}>
-        <Text style={styles.subtitle}>Add variable</Text>
-        <Field
-          label="Variable name"
-          value={form.name}
-          placeholder="STRIPE_API_KEY"
-          onChangeText={setName}
-          theme={theme}
-          disabled={pending}
-        />
-        <Field
-          label="Description"
-          value={form.description}
-          placeholder="What this variable is used for"
-          onChangeText={setDescription}
-          theme={theme}
-          disabled={pending}
-        />
-        <Field
-          label="Value"
-          value={form.value}
-          secure
-          onChangeText={setValue}
-          theme={theme}
-          disabled={pending}
-        />
-        <View style={styles.actions}>
-          <ActionButton
-            label={pending ? "Adding…" : "Add variable"}
-            onPress={submit}
+        <Text style={styles.subtitle}>{bulk ? "Paste variables" : "Add variable"}</Text>
+        {bulk ? (
+          <BulkEditor
+            workspaceId={workspaceId}
+            scope={scope}
             theme={theme}
-            variant="primary"
-            disabled={pending || !variables.isSuccess}
+            onAdded={completeBulk}
+            onCancel={closeBulk}
           />
-        </View>
-        {form.message ? (
-          <Text accessibilityRole="alert" style={messageStyle}>
-            {form.message}
-          </Text>
-        ) : null}
+        ) : (
+          <>
+            <Field
+              label="Variable name"
+              value={form.name}
+              placeholder="STRIPE_API_KEY"
+              onChangeText={setName}
+              theme={theme}
+              disabled={pending}
+            />
+            <Field
+              label="Description"
+              value={form.description}
+              placeholder="What this variable is used for"
+              onChangeText={setDescription}
+              theme={theme}
+              disabled={pending}
+            />
+            <Field
+              label="Value"
+              value={form.value}
+              secure
+              onChangeText={setValue}
+              theme={theme}
+              disabled={pending}
+            />
+            <View style={styles.actions}>
+              <ActionButton
+                label={pending ? "Adding…" : "Add variable"}
+                onPress={submit}
+                theme={theme}
+                variant="primary"
+                disabled={pending || !variables.isSuccess}
+              />
+              <ActionButton
+                label="Paste variables"
+                onPress={openBulk}
+                theme={theme}
+                disabled={pending || !variables.isSuccess}
+              />
+            </View>
+            {form.message ? (
+              <Text accessibilityRole="alert" style={messageStyle}>
+                {form.message}
+              </Text>
+            ) : null}
+          </>
+        )}
       </View>
       <Text style={styles.detail}>
         Values stay hidden until you choose Reveal or Copy. Commands using a variable can access it
