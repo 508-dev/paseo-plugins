@@ -1,5 +1,7 @@
-import { variableInput, variableName } from "../shared/environment";
-import type { Variable } from "./store";
+import { variableInput, variableName } from "./environment";
+import type { z } from "zod";
+
+type Variable = z.infer<typeof variableInput>;
 
 export function parseBulkVariables(text: string): { variables: Variable[] } | { message: string } {
   const variables: Variable[] = [];

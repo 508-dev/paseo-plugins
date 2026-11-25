@@ -171,19 +171,23 @@ export class EnvironmentStore {
     });
   }
 
-  async addMany(scope: StorageScope, additions: Variable[]) {
+  async saveMany(scope: StorageScope, additions: Variable[], overwriteNames: string[]) {
     return this.enqueue(async () => {
       const variables = await this.read(scope);
-      const names = new Set(variables.map(({ name }) => name));
-      for (const { name } of additions) {
-        if (names.has(name))
-          return {
-            status: "rejected",
-            message: `${name} already exists in this scope. Remove it from the paste and use Replace to update it.`,
-          } as const;
-        names.add(name);
+      const next = new Map(variables.map((variable) => [variable.name, variable]));
+      const approved = new Set(overwriteNames);
+      const conflicts = additions.filter(({ name }) => next.has(name));
+      if (conflicts.length !== approved.size || conflicts.some(({ name }) => !approved.has(name))) {
+        return {
+          status: "rejected",
+          message: "Saved variables changed. Review the current preview before trying again.",
+        } as const;
       }
-      if (variables.length + additions.length > 256) {
+      for (const variable of additions) {
+        const existing = next.get(variable.name);
+        next.set(variable.name, existing ? { ...existing, value: variable.value } : variable);
+      }
+      if (next.size > 256) {
         return {
           status: "rejected",
           message: "This scope can have at most 256 variables.",
@@ -191,9 +195,13 @@ export class EnvironmentStore {
       }
       await this.write(
         scope,
-        [...variables, ...additions].toSorted((a, b) => a.name.localeCompare(b.name)),
+        [...next.values()].toSorted((a, b) => a.name.localeCompare(b.name)),
       );
-      return { status: "added", count: additions.length } as const;
+      return {
+        status: "saved",
+        added: next.size - variables.length,
+        updated: conflicts.length,
+      } as const;
     });
   }
 

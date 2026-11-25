@@ -38,9 +38,14 @@ export const addVariables = defineRpc({
   input: workspaceInput.extend({
     scope: z.enum(["project", "workspace"]),
     text: z.string().max(bulkPasteLimit),
+    overwriteNames: z.array(variableName).max(256).default([]),
   }),
   output: z.discriminatedUnion("status", [
-    z.object({ status: z.literal("added"), count: z.number().int().positive() }),
+    z.object({
+      status: z.literal("saved"),
+      added: z.number().int().nonnegative(),
+      updated: z.number().int().nonnegative(),
+    }),
     z.object({ status: z.literal("rejected"), message: z.string() }),
   ]),
 });
