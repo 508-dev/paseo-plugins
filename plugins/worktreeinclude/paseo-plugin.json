@@ -2,5 +2,13 @@
   "id": "paseo-worktreeinclude",
   "requirements": {
     "paseo": ">=0.10.3"
+  },
+  "name": "Worktree include",
+  "description": "Copy or symlink gitignored files into new Git worktrees.",
+  "translations": {
+    "zh-CN": {
+      "name": "工作树文件共享",
+      "description": "将 Git 忽略的文件复制或链接到新工作树。"
+    }
   }
 }

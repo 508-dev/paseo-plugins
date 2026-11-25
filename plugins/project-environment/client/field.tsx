@@ -1,3 +1,5 @@
+import { useTranslation } from "@getpaseo/plugin/client";
+import { messages } from "./messages";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppState, Text, View } from "react-native";
 import { TextInput } from "@getpaseo/plugin/client/ui";
@@ -25,6 +27,7 @@ export function Field({
   secure = false,
   disabled = false,
 }: FieldProps) {
+  const { t } = useTranslation(messages);
   const [revealed, setRevealed] = useState(false);
   useEffect(() => {
     if (!value || disabled) setRevealed(false);
@@ -69,7 +72,7 @@ export function Field({
         <Text style={styles.label}>{label}</Text>
         {secure ? (
           <ActionButton
-            label={revealed ? "Hide value" : "Show value"}
+            label={revealed ? t("hideValue") : t("showValue")}
             onPress={toggleVisibility}
             theme={theme}
             disabled={disabled}

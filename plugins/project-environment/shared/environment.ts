@@ -32,6 +32,23 @@ export const saveVariable = defineRpc({
   input: editScope.extend({ variable: variableInput }),
   output: z.object({}),
 });
+export const bulkPasteLimit = 64 * 1024;
+export const addVariables = defineRpc({
+  name: "environment.add-variables",
+  input: workspaceInput.extend({
+    scope: z.enum(["project", "workspace"]),
+    text: z.string().max(bulkPasteLimit),
+    overwriteNames: z.array(variableName).max(256).default([]),
+  }),
+  output: z.discriminatedUnion("status", [
+    z.object({
+      status: z.literal("saved"),
+      added: z.number().int().nonnegative(),
+      updated: z.number().int().nonnegative(),
+    }),
+    z.object({ status: z.literal("rejected"), message: z.string() }),
+  ]),
+});
 export const removeVariable = defineRpc({
   name: "environment.remove",
   input: editScope.extend({ name: variableName }),
@@ -48,6 +65,29 @@ export const readVariableValue = defineRpc({
   input: z.object({ target: variableTarget, name: variableName }),
   output: z.object({ value: z.string() }).strict(),
 });
+
+const copyDestination = z.discriminatedUnion("kind", [
+  workspaceInput.extend({ kind: z.literal("workspace") }),
+  z.object({ kind: z.literal("project"), projectId: z.string().min(1) }),
+]);
+const destinationOption = z.object({
+  target: copyDestination,
+  label: z.string(),
+  directory: z.string(),
+});
+export const variableDestinations = defineRpc({
+  name: "environment.destinations",
+  input: z.object({}),
+  output: z.object({ destinations: z.array(destinationOption) }),
+});
+export const copyVariable = defineRpc({
+  name: "environment.copy",
+  input: z.object({ source: variableTarget, destination: copyDestination, name: variableName }),
+  output: z
+    .object({ status: z.enum(["copied", "exists", "same-scope", "missing", "full"]) })
+    .strict(),
+});
+export type CopyStatus = z.infer<typeof copyVariable.output>["status"];
 
 export const catalogueProject = z
   .object({

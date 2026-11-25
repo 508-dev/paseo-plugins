@@ -1,6 +1,12 @@
+import { messages } from "./messages";
 import { useState } from "react";
 import { Text } from "react-native";
-import { useSettings, type PluginSurfaceProps, type SettingsState } from "@getpaseo/plugin/client";
+import {
+  useTranslation,
+  useSettings,
+  type PluginSurfaceProps,
+  type SettingsState,
+} from "@getpaseo/plugin/client";
 import {
   SettingsAction,
   SettingsCard,
@@ -13,29 +19,30 @@ import { preferences } from "../shared/preferences";
 type ReadySettings = Extract<SettingsState<typeof preferences.schema>, { status: "ready" }>;
 
 function Editor({ settings }: { settings: ReadySettings }) {
+  const { t } = useTranslation(messages);
   const [draft, setDraft] = useState(() => ({
     values: settings.values,
     revision: settings.revision,
   }));
   return (
-    <SettingsSection title="Reply generation">
+    <SettingsSection title={t("replyGeneration")}>
       <SettingsCard>
         <SettingsSwitch
-          label="Generate after each turn"
+          label={t("generateAfterTurn")}
           value={draft.values.enabled}
           disabled={settings.saving}
           onValueChange={(enabled) => setDraft({ ...draft, values: { ...draft.values, enabled } })}
         />
         <SettingsInput
-          label="Claude model"
-          hint="A Claude CLI model alias or full model ID. Independent of the conversation model."
+          label={t("model")}
+          hint={t("modelHint")}
           initialValue={draft.values.model}
           disabled={settings.saving}
           onChangeText={(model) => setDraft({ ...draft, values: { ...draft.values, model } })}
         />
         <SettingsInput
-          label="Claude executable"
-          hint="Executable name or absolute path on the daemon host. Arguments are never interpreted by a shell."
+          label={t("executable")}
+          hint={t("executableHint")}
           initialValue={draft.values.executable}
           disabled={settings.saving}
           onChangeText={(executable) =>
@@ -43,10 +50,12 @@ function Editor({ settings }: { settings: ReadySettings }) {
           }
         />
         <SettingsAction
-          label="Save generation settings"
-          actionLabel="Save"
+          label={t("saveSettings")}
+          actionLabel={t("save")}
           disabled={settings.saving}
-          error={settings.saveError}
+          error={
+            settings.saveError ? t("saveError", { detail: settings.saveError }) : settings.saveError
+          }
           onPress={async () => {
             await settings.save(draft.values, draft.revision);
           }}
@@ -57,18 +66,19 @@ function Editor({ settings }: { settings: ReadySettings }) {
 }
 
 export function GenerationSettings({ theme }: PluginSurfaceProps) {
+  const { t } = useTranslation(messages);
   const settings = useSettings(preferences);
   if (settings.status === "ready") return <Editor key={settings.revision} settings={settings} />;
   if (settings.status === "loading")
-    return <Text style={{ color: theme.colors.foreground }}>Loading settings…</Text>;
+    return <Text style={{ color: theme.colors.foreground }}>{t("loading")}</Text>;
   return (
-    <SettingsSection title="Reply generation">
+    <SettingsSection title={t("replyGeneration")}>
       <Text accessibilityRole="alert" style={{ color: theme.colors.foreground }}>
-        {settings.error}
+        {t("loadError", { detail: settings.error })}
       </Text>
-      <SettingsAction label="Read settings again" actionLabel="Retry" onPress={settings.reload} />
+      <SettingsAction label={t("readAgain")} actionLabel={t("retry")} onPress={settings.reload} />
       {settings.status === "invalid" ? (
-        <SettingsAction label="Restore defaults" actionLabel="Reset" onPress={settings.reset} />
+        <SettingsAction label={t("restore")} actionLabel={t("reset")} onPress={settings.reset} />
       ) : null}
     </SettingsSection>
   );

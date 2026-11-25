@@ -10,12 +10,14 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { z } from "zod";
 import { EnvironmentBroker } from "./broker";
 import { EnvironmentStore, projectScope, workspaceScope } from "./store";
+import { parseBulkVariables } from "../shared/bulk-paste";
 import { execute, redact } from "./execute";
 import { buildVariableCatalogue } from "./catalogue";
 import {
   filterVariableCatalogue,
   variableCatalogue,
   readVariableValue,
+  copyVariable,
 } from "../shared/environment";
 import { VariableValueController } from "../client/value-controller";
 import { SavedVariableEditor } from "../client/saved-variable-editor";
@@ -169,6 +171,31 @@ test("Git worktrees inherit project defaults and can override them independently
   expect(workspaceOnly.projects).toHaveLength(1);
   expect(workspaceOnly.projects[0].variables).toEqual([]);
   expect(filterVariableCatalogue(workspaceOnly.projects, "LOCAL_KEY")).toHaveLength(1);
+});
+
+test("copies across scopes without returning the value or overwriting a destination", async () => {
+  const { scope: source, store } = await fixture();
+  const { scope: destination } = await fixture();
+  const local = await workspaceScope(destination);
+  const variable = { name: "API_KEY", description: "Sandbox API", value: "fixture-value" };
+  await store.save(source, variable);
+  await store.save(destination, { ...variable, value: "fixture-default" });
+  const first = store.copy(source, local, variable.name);
+  const repeated = store.copy(source, local, variable.name);
+  const [copied, exists] = await Promise.all([first, repeated]);
+  expect([copied, exists]).toEqual(["copied", "exists"]);
+  expect(await store.read(local)).toEqual([variable]);
+  expect(await store.read(source)).toEqual([variable]);
+  expect(await store.copy(local, destination, variable.name)).toBe("exists");
+  expect(await store.readValue(destination, variable.name)).toBe("fixture-default");
+  expect(await store.copy(local, local, variable.name)).toBe("same-scope");
+  expect(await store.copy(source, destination, "MISSING_KEY")).toBe("missing");
+  await store.remove(destination, variable.name);
+  expect(await store.copy(local, destination, variable.name)).toBe("copied");
+  expect(await store.read(destination)).toEqual([variable]);
+  expect(copyVariable.output.safeParse({ status: copied, value: variable.value }).success).toBe(
+    false,
+  );
 });
 
 test("injects only requested variables, redacts both streams across chunks, and preserves exit codes", async () => {
@@ -496,7 +523,7 @@ test("values are fetched only by explicit actions and Copy reads the current val
   await controller.copy();
   expect(copied).toEqual(["private-2"]);
   expect(JSON.stringify(controller.getState())).not.toContain("private-");
-  expect(controller.getState().message).toBe("Copied to clipboard.");
+  expect(controller.getState().message).toBe("copied");
   controller.hide();
 });
 
@@ -520,7 +547,7 @@ test("hiding a value cancels a late reveal and errors do not expose credentials"
     },
   });
   await failing.copy();
-  expect(failing.getState().message).toContain("Could not copy");
+  expect(failing.getState().message).toBe("copyError");
   expect(JSON.stringify(failing.getState())).not.toContain("private-copy-value");
 });
 
@@ -548,7 +575,7 @@ test("replacement stays in its own card and gives local success feedback", async
   ]);
   expect(replacing.getState().mode).toBe("view");
   expect(replacing.getState().status).toBe("success");
-  expect(replacing.getState().message).toContain("Value updated");
+  expect(replacing.getState().message).toBe("updated");
   expect(JSON.stringify(replacing.getState())).not.toContain("replacement-private-value");
   expect(adding.getState().name).toBe("UNRELATED_NEW_KEY");
   expect(adding.getState().value).toBe("new-draft-value");
@@ -581,7 +608,7 @@ test("Cancel clears a replacement and removal requires a confirmation in that ca
   editor.confirmRemove();
   await editor.remove();
   expect(removals).toBe(1);
-  expect(editor.getState().message).toBe("API_KEY removed.");
+  expect(editor.getState().message).toBe("removed");
 });
 
 test("a failed replacement clears its value and leaves an actionable error in that card", async () => {
@@ -596,7 +623,7 @@ test("a failed replacement clears its value and leaves an actionable error in th
   await editor.save();
   expect(editor.getState().mode).toBe("replace");
   expect(editor.getState().status).toBe("error");
-  expect(editor.getState().message).toContain("Re-enter the value");
+  expect(editor.getState().message).toBe("updateError");
   expect(JSON.stringify(editor.getState())).not.toContain("private-replacement");
 });
 
@@ -611,5 +638,56 @@ test("the Add form directs existing names to their own Replace action", async ()
   editor.set("value", "draft-value");
   await editor.save(["API_KEY"]);
   expect(saves).toBe(0);
-  expect(editor.getState().message).toContain("Use Replace on its card");
+  expect(editor.getState().message).toBe("alreadyExists");
+});
+
+test("bulk paste preserves literal values and reports invalid lines without their contents", () => {
+  expect(
+    parseBulkVariables(
+      "# Example\r\n\r\nAPI_SECRET=abc==#literal\r\nBASE_URL =https://example.test\r\n",
+    ),
+  ).toEqual({
+    variables: [
+      { name: "API_SECRET", value: "abc==#literal", description: "" },
+      { name: "BASE_URL", value: "https://example.test", description: "" },
+    ],
+  });
+  expect(parseBulkVariables("VALID=first\nmalformed-sensitive-text")).toEqual({
+    message: "Line 2: use an uppercase NAME=value assignment.",
+  });
+  expect(parseBulkVariables("API_SECRET=first\nAPI_SECRET=second")).toEqual({
+    message: "Line 2: API_SECRET appears more than once.",
+  });
+});
+
+test("bulk add rejects a conflicting batch atomically and can add workspace overrides", async () => {
+  const { scope, store } = await fixture();
+  const workspace = await workspaceScope(scope);
+  const saved = { name: "API_SECRET", value: "original", description: "Keep this" };
+  const additions = [
+    { name: "BASE_URL", value: "https://example.test", description: "" },
+    { name: "API_SECRET", value: "override", description: "" },
+  ];
+  await store.save(scope, saved);
+
+  expect(await store.saveMany(scope, additions, [])).toMatchObject({ status: "rejected" });
+  expect(await store.read(scope)).toEqual([saved]);
+  expect(await store.saveMany(workspace, additions, [])).toEqual({
+    status: "saved",
+    added: 2,
+    updated: 0,
+  });
+  expect(await store.read(workspace)).toEqual([additions[1], additions[0]]);
+  expect(await store.read(scope)).toEqual([saved]);
+
+  expect(await store.saveMany(scope, additions, ["BASE_URL"])).toMatchObject({
+    status: "rejected",
+  });
+  expect(await store.read(scope)).toEqual([saved]);
+  expect(await store.saveMany(scope, additions, ["API_SECRET"])).toEqual({
+    status: "saved",
+    added: 1,
+    updated: 1,
+  });
+  expect(await store.read(scope)).toEqual([{ ...saved, value: "override" }, additions[0]]);
 });

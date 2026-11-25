@@ -5,6 +5,7 @@ import {
   cardsForAgent,
   directActions,
   filterCards,
+  InboxResponseError,
   isUnread,
   markRead,
   questionPreview,
@@ -203,7 +204,17 @@ describe("approval state across row remounts", () => {
     reject(new Error("Request changed"));
     await operation;
     store.prune(new Set(["card-a"]));
-    expect(store.getSnapshot().get("card-a")).toEqual({ pending: null, error: "Request changed" });
+    expect(store.getSnapshot().get("card-a")).toEqual({
+      pending: null,
+      error: { detail: "Request changed" },
+    });
+    await store.run("card-a", "accept", async () => {
+      throw new InboxResponseError("changedRequest", "Request changed");
+    });
+    expect(store.getSnapshot().get("card-a")).toEqual({
+      pending: null,
+      error: { key: "changedRequest" },
+    });
     await store.run("card-a", "accept", async () => {});
     expect(store.getSnapshot().has("card-a")).toBe(false);
   });

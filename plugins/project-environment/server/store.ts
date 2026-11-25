@@ -4,7 +4,7 @@ import { chmod, mkdir, readFile, readdir, realpath, rename, rm, writeFile } from
 import path from "node:path";
 import { promisify } from "node:util";
 import { z } from "zod";
-import { variableInput, variableMetadata } from "../shared/environment";
+import { type CopyStatus, variableInput, variableMetadata } from "../shared/environment";
 
 const execFileAsync = promisify(execFile);
 const documentSchema = z.object({ variables: z.array(variableInput).max(256) });
@@ -94,7 +94,7 @@ export async function readJson(file: string): Promise<unknown | null> {
 }
 
 export class EnvironmentStore {
-  private writes = Promise.resolve();
+  private writes: Promise<unknown> = Promise.resolve();
   constructor(private directory: string) {}
 
   private file(scope: StorageKey): string {
@@ -171,21 +171,76 @@ export class EnvironmentStore {
     });
   }
 
+  async saveMany(scope: StorageScope, additions: Variable[], overwriteNames: string[]) {
+    return this.enqueue(async () => {
+      const variables = await this.read(scope);
+      const next = new Map(variables.map((variable) => [variable.name, variable]));
+      const approved = new Set(overwriteNames);
+      const conflicts = additions.filter(({ name }) => next.has(name));
+      if (conflicts.length !== approved.size || conflicts.some(({ name }) => !approved.has(name))) {
+        return {
+          status: "rejected",
+          message: "Saved variables changed. Review the current preview before trying again.",
+        } as const;
+      }
+      for (const variable of additions) {
+        const existing = next.get(variable.name);
+        next.set(variable.name, existing ? { ...existing, value: variable.value } : variable);
+      }
+      if (next.size > 256) {
+        return {
+          status: "rejected",
+          message: "This scope can have at most 256 variables.",
+        } as const;
+      }
+      await this.write(
+        scope,
+        [...next.values()].toSorted((a, b) => a.name.localeCompare(b.name)),
+      );
+      return {
+        status: "saved",
+        added: next.size - variables.length,
+        updated: conflicts.length,
+      } as const;
+    });
+  }
+
   async remove(scope: StorageScope, name: string): Promise<void> {
     return this.change(scope, (variables) => variables.filter((entry) => entry.name !== name));
+  }
+
+  async copy(source: StorageKey, destination: StorageScope, name: string): Promise<CopyStatus> {
+    if (this.file(source) === this.file(destination)) return "same-scope";
+    return this.enqueue(async () => {
+      const variable = (await this.read(source)).find((entry) => entry.name === name);
+      if (!variable) return "missing";
+      const variables = await this.read(destination);
+      if (variables.some((entry) => entry.name === name)) return "exists";
+      if (variables.length >= 256) return "full";
+      await this.write(
+        destination,
+        [...variables, variable].toSorted((a, b) => a.name.localeCompare(b.name)),
+      );
+      return "copied";
+    });
   }
 
   private change(
     scope: StorageScope,
     update: (variables: Variable[]) => Variable[],
   ): Promise<void> {
-    const write = this.writes.then(async () => {
+    return this.enqueue(async () => {
       const variables = update(await this.read(scope));
-      return privateWrite(this.file(scope), {
-        directory: scope.cwd,
-        variables,
-      });
+      await this.write(scope, variables);
     });
+  }
+
+  private write(scope: StorageScope, variables: Variable[]) {
+    return privateWrite(this.file(scope), { directory: scope.cwd, variables });
+  }
+
+  private enqueue<T>(operation: () => Promise<T>) {
+    const write = this.writes.then(operation);
     this.writes = write.catch(() => {});
     return write;
   }

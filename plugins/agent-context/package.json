@@ -16,10 +16,12 @@
     "paseo-plugin.json",
     "index.client.ts",
     "index.server.ts",
+    "client/",
     "server/",
     "shared/",
     "LICENSE",
-    "OVERVIEW.md"
+    "OVERVIEW.md",
+    "OVERVIEW.*.md"
   ],
   "type": "module",
   "publishConfig": {
@@ -31,7 +33,7 @@
     "test": "vitest run"
   },
   "devDependencies": {
-    "@getpaseo/plugin": "0.9.1",
+    "@getpaseo/plugin": "0.13.0",
     "@types/node": "^20.9.0",
     "typescript": "^5.9.3",
     "vitest": "^4.1.6",

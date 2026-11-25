@@ -1,14 +1,21 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { FlatList, Switch, Text, View } from "react-native";
-import { getPaseoClient, useSettings, type PluginScreenProps } from "@getpaseo/plugin/client";
+import {
+  getPaseoClient,
+  useSettings,
+  useTranslation,
+  type PluginScreenProps,
+} from "@getpaseo/plugin/client";
 import { inboxPreferences } from "../shared/preferences";
 import { filterCards, isUnread, markRead, respondToCard, type InboxCard } from "./inbox-model";
 import { createApprovalStore } from "./inbox-approvals";
 import { InboxButton, InboxFilter } from "./inbox-controls";
 import { InboxRow } from "./inbox-row";
 import { useInbox } from "./use-inbox";
+import { messages } from "./messages";
 
 export function InboxScreen({ theme, layout, navigation }: PluginScreenProps) {
+  const { t, locale } = useTranslation(messages);
   const inbox = useInbox();
   const preferences = useSettings(inboxPreferences);
   const [hostId, setHostId] = useState<string | null>(null);
@@ -49,7 +56,7 @@ export function InboxScreen({ theme, layout, navigation }: PluginScreenProps) {
           { value: card.projectKey, label: card.projectName, description: card.hostLabel },
         ]),
     ).values(),
-  ].sort((a, b) => a.label.localeCompare(b.label));
+  ].sort((a, b) => a.label.localeCompare(b.label, locale));
   const offline = inbox.hosts.filter((host) => host.status !== "online");
   const filtered = hostId !== null || projectKey !== null || unreadOnly;
 
@@ -123,15 +130,15 @@ export function InboxScreen({ theme, layout, navigation }: PluginScreenProps) {
           >
             <View style={{ gap: 3, flex: 1 }}>
               <Text style={{ color: theme.colors.foreground, fontSize: 17, fontWeight: "500" }}>
-                {inbox.loading ? "Action inbox" : `${attentionCount} need attention`}
+                {inbox.loading ? t("inbox") : t("attentionCount", { count: attentionCount })}
               </Text>
               <Text style={muted}>
                 {readReady
-                  ? `${unreadCount} unread`
+                  ? t("unreadCount", { count: unreadCount })
                   : preferences.status === "loading"
-                    ? "Loading read status..."
-                    : "Read status unavailable"}{" "}
-                · {onlineCount} online {onlineCount === 1 ? "host" : "hosts"}
+                    ? t("loadingRead")
+                    : t("readUnavailable")}{" "}
+                · {t("onlineHosts", { count: onlineCount })}
               </Text>
             </View>
             <InboxButton
@@ -139,7 +146,7 @@ export function InboxScreen({ theme, layout, navigation }: PluginScreenProps) {
               compact={layout.compact}
               onPress={() => void inbox.refresh()}
               disabled={inbox.refreshing}
-              label="Refresh inbox"
+              label={t("refresh")}
               icon="RefreshCw"
               variant="outline"
             />
@@ -147,13 +154,16 @@ export function InboxScreen({ theme, layout, navigation }: PluginScreenProps) {
           <View style={{ gap: 6 }}>
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
               <InboxFilter
-                title="Hosts"
-                allLabel="All hosts"
+                title={t("hosts")}
+                allLabel={t("allHosts")}
+                selectedLabel={t("selectedHost")}
+                filterTitle={t("filterHosts")}
+                searchLabel={t("searchHosts")}
                 value={hostId}
                 options={inbox.hosts.map((host) => ({
                   value: host.serverId,
                   label: host.label,
-                  description: host.status === "online" ? "Online" : "Offline or connecting",
+                  description: host.status === "online" ? t("online") : t("offline"),
                 }))}
                 onChange={(value) => {
                   setHostId(value);
@@ -163,8 +173,11 @@ export function InboxScreen({ theme, layout, navigation }: PluginScreenProps) {
                 compact={layout.compact}
               />
               <InboxFilter
-                title="Projects"
-                allLabel="All projects"
+                title={t("projects")}
+                allLabel={t("allProjects")}
+                selectedLabel={t("selectedProject")}
+                filterTitle={t("filterProjects")}
+                searchLabel={t("searchProjects")}
                 value={projectKey}
                 options={projects}
                 onChange={setProjectKey}
@@ -184,8 +197,8 @@ export function InboxScreen({ theme, layout, navigation }: PluginScreenProps) {
                 <Switch
                   accessibilityLabel={
                     unreadFailures > 0
-                      ? `Show failures, ${unreadFailures} unread ${unreadFailures === 1 ? "failure" : "failures"}`
-                      : "Show failures"
+                      ? t("unreadFailures", { count: unreadFailures })
+                      : t("failures")
                   }
                   disabled={failuresToggleDisabled}
                   value={showFailures}
@@ -198,7 +211,9 @@ export function InboxScreen({ theme, layout, navigation }: PluginScreenProps) {
                   hitSlop={8}
                 />
                 <Text style={{ color: theme.colors.foreground, fontSize: 13 }}>
-                  Show failures{unreadFailures > 0 ? ` (${unreadFailures})` : ""}
+                  {unreadFailures > 0
+                    ? t("failuresCount", { count: unreadFailures })
+                    : t("failures")}
                 </Text>
               </View>
             </View>
@@ -218,7 +233,7 @@ export function InboxScreen({ theme, layout, navigation }: PluginScreenProps) {
                   selected={!unreadOnly}
                   onPress={() => setUnreadOnly(false)}
                 >
-                  All
+                  {t("all")}
                 </InboxButton>
                 <InboxButton
                   theme={theme}
@@ -227,7 +242,7 @@ export function InboxScreen({ theme, layout, navigation }: PluginScreenProps) {
                   disabled={!readReady}
                   onPress={() => setUnreadOnly(true)}
                 >
-                  Unread{readReady ? ` ${scopedUnreadCount}` : ""}
+                  {readReady ? t("unreadTab", { count: scopedUnreadCount }) : t("unread")}
                 </InboxButton>
               </View>
               <InboxButton
@@ -237,26 +252,27 @@ export function InboxScreen({ theme, layout, navigation }: PluginScreenProps) {
                   !readReady || preferences.saving || !visible.some((card) => isUnread(card, read))
                 }
                 onPress={() => void setRead(visible, true)}
-                label="Mark visible items read"
+                label={t("markVisible")}
                 icon="CheckCheck"
                 variant="outline"
               >
-                Mark all read
+                {t("markAll")}
               </InboxButton>
             </View>
           </View>
           {offline.length ? (
             <Text style={muted}>
-              Offline or connecting: {offline.map((host) => host.label).join(", ")}. Showing online
-              hosts only.
+              {t("offlineHosts", { hosts: offline.map((host) => host.label).join(", ") })}
             </Text>
           ) : null}
           {inbox.truncatedHosts.length ? (
-            <Text style={muted}>First 1,000 agents on: {inbox.truncatedHosts.join(", ")}</Text>
+            <Text style={muted}>
+              {t("truncated", { limit: 1000, hosts: inbox.truncatedHosts.join(", ") })}
+            </Text>
           ) : null}
-          {inbox.errors.map((error) => (
-            <Text key={error} style={{ color: theme.colors.statusDanger, fontSize: 12 }}>
-              {error}
+          {inbox.errors.map(({ hostId, host, detail }) => (
+            <Text key={hostId} style={{ color: theme.colors.statusDanger, fontSize: 12 }}>
+              {t("loadAgentsError", { host, detail })}
             </Text>
           ))}
           {preferences.status === "error" ||
@@ -264,36 +280,30 @@ export function InboxScreen({ theme, layout, navigation }: PluginScreenProps) {
           preferences.saveError ? (
             <View style={{ gap: 4 }}>
               <Text style={{ color: theme.colors.statusDanger, fontSize: 12 }}>
-                {preferences.saveError
-                  ? "Could not save inbox preferences"
-                  : "Could not load inbox preferences"}
+                {preferences.saveError ? t("savePreferencesError") : t("loadPreferencesError")}
               </Text>
               <InboxButton
                 theme={theme}
                 compact={layout.compact}
                 onPress={() => void preferences.reload()}
               >
-                Reload inbox preferences
+                {t("reloadPreferences")}
               </InboxButton>
             </View>
           ) : null}
           {filtered ? (
             <Text style={muted}>
-              {visible.length} shown
+              {t("shown", { count: visible.length })}
               {hostId
-                ? ` · ${inbox.hosts.find((host) => host.serverId === hostId)?.label ?? "Selected host"}`
+                ? ` · ${inbox.hosts.find((host) => host.serverId === hostId)?.label ?? t("selectedHost")}`
                 : ""}
             </Text>
           ) : null}
-          {inbox.loading ? <Text style={muted}>Loading agents...</Text> : null}
+          {inbox.loading ? <Text style={muted}>{t("loadingAgents")}</Text> : null}
           {!inbox.loading && visible.length === 0 ? (
             <View style={{ paddingVertical: 32, gap: 8, alignItems: "center" }}>
               <Text style={muted}>
-                {unreadOnly
-                  ? "No unread items in this view"
-                  : filtered
-                    ? "No items in this view"
-                    : "No requests need attention"}
+                {unreadOnly ? t("noUnread") : filtered ? t("noItems") : t("noAttention")}
               </Text>
               {filtered ? (
                 <InboxButton
@@ -305,7 +315,7 @@ export function InboxScreen({ theme, layout, navigation }: PluginScreenProps) {
                     setUnreadOnly(false);
                   }}
                 >
-                  Clear filters
+                  {t("clearFilters")}
                 </InboxButton>
               ) : null}
             </View>

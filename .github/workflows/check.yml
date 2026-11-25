@@ -34,6 +34,7 @@ jobs:
             remote-browser,
             replies,
             worktreeinclude,
+            latest-turn-changes,
           ]
     defaults:
       run:

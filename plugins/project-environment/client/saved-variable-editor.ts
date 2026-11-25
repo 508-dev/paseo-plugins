@@ -9,7 +9,15 @@ interface SavedVariableState {
   status: "idle" | "pending" | "success" | "error";
   description: string;
   value: string;
-  message: string;
+  message:
+    | ""
+    | "invalidReplacement"
+    | "saving"
+    | "updated"
+    | "updateError"
+    | "removing"
+    | "removed"
+    | "removeError";
 }
 
 export class SavedVariableEditor {
@@ -62,34 +70,34 @@ export class SavedVariableEditor {
     if (!parsed.success) {
       this.publish({
         status: "error",
-        message: "Enter a new value (up to 16 KiB) and a description up to 500 characters.",
+        message: "invalidReplacement",
       });
       return;
     }
-    this.publish({ status: "pending", value: "", message: "Saving…" });
+    this.publish({ status: "pending", value: "", message: "saving" });
     try {
       await this.actions.save(parsed.data);
       this.publish({
         mode: "view",
         status: "success",
         description: "",
-        message: "Value updated. The next environment command will use it.",
+        message: "updated",
       });
     } catch {
       this.publish({
         status: "error",
-        message: "Could not update this variable. Re-enter the value and try again.",
+        message: "updateError",
       });
     }
   }
   async remove() {
     if (this.state.mode !== "confirm-remove" || this.state.status === "pending") return;
-    this.publish({ status: "pending", message: "Removing…" });
+    this.publish({ status: "pending", message: "removing" });
     try {
       await this.actions.remove(this.name);
-      this.publish({ mode: "removed", status: "success", message: `${this.name} removed.` });
+      this.publish({ mode: "removed", status: "success", message: "removed" });
     } catch {
-      this.publish({ status: "error", message: "Could not remove this variable. Try again." });
+      this.publish({ status: "error", message: "removeError" });
     }
   }
 }

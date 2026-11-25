@@ -1,5 +1,6 @@
 {
   "id": "action-inbox",
+  "name": "Action inbox",
   "description": "Show agent requests and review-ready work across connected hosts",
   "requirements": {
     "paseo": ">=0.16.0-beta.1"
@@ -14,5 +15,12 @@
       "--no-audit",
       "--no-fund"
     ]
-  ]
+  ],
+  "name": "Action inbox",
+  "translations": {
+    "zh-CN": {
+      "name": "行动收件箱",
+      "description": "查看已连接主机上的代理请求和待审查工作。"
+    }
+  }
 }

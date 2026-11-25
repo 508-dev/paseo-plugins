@@ -1,6 +1,7 @@
+import { messages } from "./messages";
 import { useEffect, useState } from "react";
 import { Linking, Pressable, Text, View } from "react-native";
-import { useRpc, type PluginWorkspacePanelProps } from "@getpaseo/plugin/client";
+import { useTranslation, useRpc, type PluginWorkspacePanelProps } from "@getpaseo/plugin/client";
 import { associationRpc, type Issue } from "../shared/issues";
 
 type Association = {
@@ -11,6 +12,7 @@ type Association = {
 };
 
 export function AssociationPanel({ workspaceId, theme, layout }: PluginWorkspacePanelProps) {
+  const { t } = useTranslation(messages);
   const resolve = useRpc(associationRpc);
   const [association, setAssociation] = useState<Association | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -40,12 +42,10 @@ export function AssociationPanel({ workspaceId, theme, layout }: PluginWorkspace
   };
   return (
     <View style={container}>
-      <Text style={[foreground, { fontSize: 20, fontWeight: "600" }]}>GitHub issue</Text>
-      {error ? <Text style={muted}>{error}</Text> : null}
-      {!association && !error ? <Text style={muted}>Loading…</Text> : null}
-      {association && !association.issue ? (
-        <Text style={muted}>No GitHub issue is linked to this workspace.</Text>
-      ) : null}
+      <Text style={[foreground, { fontSize: 20, fontWeight: "600" }]}>{t("issue")}</Text>
+      {error ? <Text style={muted}>{t("loadError", { detail: error })}</Text> : null}
+      {!association && !error ? <Text style={muted}>{t("loading")}</Text> : null}
+      {association && !association.issue ? <Text style={muted}>{t("noIssue")}</Text> : null}
       {association?.issue ? (
         <View style={{ gap: 8 }}>
           <Text style={foreground}>
@@ -57,12 +57,12 @@ export function AssociationPanel({ workspaceId, theme, layout }: PluginWorkspace
           >
             <Text style={{ color: theme.colors.accent }}>{association.issue.url}</Text>
           </Pressable>
-          <Text style={muted}>Branch: {association.branch ?? "Detached HEAD"}</Text>
+          <Text style={muted}>{t("branch", { name: association.branch ?? t("detached") })}</Text>
         </View>
       ) : null}
       {association?.issue ? (
         <View style={{ gap: 8 }}>
-          <Text style={[foreground, { fontSize: 17, fontWeight: "600" }]}>Pull request</Text>
+          <Text style={[foreground, { fontSize: 17, fontWeight: "600" }]}>{t("pullRequest")}</Text>
           {association.pullRequest ? (
             <Pressable
               accessibilityRole="link"
@@ -70,16 +70,23 @@ export function AssociationPanel({ workspaceId, theme, layout }: PluginWorkspace
             >
               <Text style={{ color: theme.colors.accent }}>
                 #{association.pullRequest.number} {association.pullRequest.title} (
-                {association.pullRequest.state})
+                {pullRequestState(association.pullRequest.state, t)})
               </Text>
             </Pressable>
           ) : association.pullRequestError ? (
-            <Text style={muted}>{association.pullRequestError}</Text>
+            <Text style={muted}>
+              {t("pullRequestError", { detail: association.pullRequestError })}
+            </Text>
           ) : (
-            <Text style={muted}>No pull request found for this branch.</Text>
+            <Text style={muted}>{t("noPullRequest")}</Text>
           )}
         </View>
       ) : null}
     </View>
   );
+}
+
+function pullRequestState(state: string, t: (key: "open" | "closed" | "merged") => string) {
+  const key = state.toLowerCase();
+  return key === "open" || key === "closed" || key === "merged" ? t(key) : state;
 }

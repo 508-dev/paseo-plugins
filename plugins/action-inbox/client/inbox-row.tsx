@@ -1,3 +1,5 @@
+import { useTranslation } from "@getpaseo/plugin/client";
+import { messages } from "./messages";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { Icon } from "@getpaseo/plugin/client/ui";
@@ -15,25 +17,16 @@ import { InboxButton } from "./inbox-controls";
 import type { ApprovalState } from "./inbox-approvals";
 import { useInboxProgress } from "./use-inbox";
 
-const kinds: Record<InboxKind, { label: string; icon: string; action: string }> = {
-  question: { label: "Question", icon: "MessageCircle", action: "Answer question" },
-  approval: { label: "Approval", icon: "ShieldCheck", action: "Open agent" },
-  attention: { label: "Needs input", icon: "MessageCircle", action: "Open agent" },
-  failed: { label: "Failed", icon: "CircleAlert", action: "Inspect failure" },
-  review: { label: "Ready to review", icon: "CheckCheck", action: "Review work" },
+const kinds: Record<
+  InboxKind,
+  { icon: string; action: "answer" | "openAgent" | "inspect" | "reviewWork" }
+> = {
+  question: { icon: "MessageCircle", action: "answer" },
+  approval: { icon: "ShieldCheck", action: "openAgent" },
+  attention: { icon: "MessageCircle", action: "openAgent" },
+  failed: { icon: "CircleAlert", action: "inspect" },
+  review: { icon: "CheckCheck", action: "reviewWork" },
 };
-
-function age(timestamp: string) {
-  const minutes = Math.max(0, Math.floor((Date.now() - Date.parse(timestamp)) / 60_000));
-  if (!Number.isFinite(minutes)) return "";
-  return minutes < 1
-    ? "Now"
-    : minutes < 60
-      ? `${minutes}m`
-      : minutes < 1440
-        ? `${Math.floor(minutes / 60)}h`
-        : `${Math.floor(minutes / 1440)}d`;
-}
 
 export function InboxRow({
   card,
@@ -58,6 +51,7 @@ export function InboxRow({
   approval?: ApprovalState;
   onRespond(action: PermissionAction): void;
 }) {
+  const { t, locale } = useTranslation(messages);
   const [expanded, setExpanded] = useState(false);
   const pending = approval?.pending ?? null;
   const error = approval?.error;
@@ -70,19 +64,36 @@ export function InboxRow({
   const openRow = tapToOpen ? onOpen : undefined;
   const foreground = { color: theme.colors.foreground, fontSize: 14, lineHeight: 20 };
   const muted = { color: theme.colors.foregroundMuted, fontSize: 12, lineHeight: 18 };
+  const updatedAt = new Date(card.updatedAt);
+  const minutes = Math.max(0, Math.floor((Date.now() - updatedAt.getTime()) / 60_000));
+
+  function age() {
+    if (!Number.isFinite(minutes)) return "";
+    if (minutes < 1) return t("now");
+    if (minutes < 60) return t("minutesAgo", { count: minutes });
+    if (minutes < 1440) return t("hoursAgo", { count: Math.floor(minutes / 60) });
+    return t("daysAgo", { count: Math.floor(minutes / 1440) });
+  }
 
   const content = (
     <>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
         <Icon
           name={kind.icon}
           size={14}
           color={card.kind === "failed" ? theme.colors.statusDanger : theme.colors.foregroundMuted}
         />
-        <Text style={muted}>{kind.label}</Text>
-        {unread ? <Text style={{ color: theme.colors.accent, fontSize: 11 }}>Unread</Text> : null}
-        <Text accessibilityLabel={card.updatedAt} style={[muted, { marginLeft: "auto" }]}>
-          {age(card.updatedAt)}
+        <Text style={muted}>{t(card.kind)}</Text>
+        {unread ? (
+          <Text style={{ color: theme.colors.accent, fontSize: 11 }}>{t("unread")}</Text>
+        ) : null}
+        <Text
+          accessibilityLabel={
+            Number.isFinite(minutes) ? updatedAt.toLocaleString(locale) : card.updatedAt
+          }
+          style={[muted, { marginLeft: "auto" }]}
+        >
+          {age()}
         </Text>
       </View>
       <Text style={[foreground, { fontWeight: unread ? "600" : "400" }]}>{card.agentTitle}</Text>
@@ -95,13 +106,13 @@ export function InboxRow({
             {questions[0]?.question ??
               card.permission.description ??
               card.permission.title ??
-              "The agent has a question for you"}
+              t("agentQuestion")}
           </Text>
           {questions[0]?.options.length ? (
             <View style={{ gap: 4 }}>
               <Text style={muted}>
-                {questions[0].multiSelect ? "Choose one or more" : "Choose one"} ·{" "}
-                {questions[0].options.length} options
+                {questions[0].multiSelect ? t("chooseMany") : t("chooseOne")} ·{" "}
+                {t("options", { count: questions[0].options.length })}
               </Text>
               {questions[0].options.slice(0, 2).map((option, index) => (
                 <Text key={index} numberOfLines={2} style={muted}>
@@ -110,18 +121,20 @@ export function InboxRow({
                 </Text>
               ))}
               {questions[0].options.length > 2 ? (
-                <Text style={muted}>+{questions[0].options.length - 2} more options</Text>
+                <Text style={muted}>
+                  {t("moreOptions", { count: questions[0].options.length - 2 })}
+                </Text>
               ) : null}
             </View>
           ) : null}
           {questions.length > 1 ? (
-            <Text style={muted}>+{questions.length - 1} more questions</Text>
+            <Text style={muted}>{t("moreQuestions", { count: questions.length - 1 })}</Text>
           ) : null}
         </View>
       ) : null}
       {card.kind === "approval" && card.permission ? (
         <Text numberOfLines={expanded ? undefined : 2} selectable style={foreground}>
-          {permissionSummary(card.permission)}
+          {permissionSummary(card.permission) ?? t("reviewInAgent")}
         </Text>
       ) : null}
       {card.kind === "failed" && card.error ? (
@@ -129,9 +142,7 @@ export function InboxRow({
           {card.error}
         </Text>
       ) : null}
-      {card.kind === "attention" ? (
-        <Text style={foreground}>The agent is waiting for your input</Text>
-      ) : null}
+      {card.kind === "attention" ? <Text style={foreground}>{t("agentWaiting")}</Text> : null}
       {progress ? (
         <View
           style={{
@@ -145,7 +156,7 @@ export function InboxRow({
             numberOfLines={2}
             style={{ color: theme.colors.foreground, fontSize: 13, lineHeight: 19 }}
           >
-            <Text style={{ fontWeight: "600" }}>Latest update</Text>
+            <Text style={{ fontWeight: "600" }}>{t("latestUpdate")}</Text>
             {"  "}
             {progress}
           </Text>
@@ -158,12 +169,12 @@ export function InboxRow({
       theme={theme}
       compact={compact || Boolean(openRow)}
       disabled={readDisabled}
-      label={unread ? "Mark read" : "Mark unread"}
+      label={unread ? t("markRead") : t("markUnread")}
       onPress={onToggleRead}
       icon={unread ? "MailOpen" : "Mail"}
       variant="outline"
     >
-      {openRow ? undefined : unread ? "Mark read" : "Mark unread"}
+      {openRow ? undefined : unread ? t("markRead") : t("markUnread")}
     </InboxButton>
   );
 
@@ -182,7 +193,7 @@ export function InboxRow({
         <View>
           <Pressable
             accessibilityRole="button"
-            accessibilityHint="Opens the agent tab"
+            accessibilityHint={t("openHint")}
             onPress={openRow}
             style={({ pressed }) => ({
               flexDirection: "row",
@@ -229,7 +240,7 @@ export function InboxRow({
               accessibilityRole="alert"
               style={{ color: theme.colors.statusDanger, fontSize: 12 }}
             >
-              {error}
+              {"key" in error ? t(error.key) : t("responseError", { detail: error.detail })}
             </Text>
           ) : null}
           <View
@@ -249,7 +260,7 @@ export function InboxRow({
                 icon="ShieldCheck"
                 onPress={() => setExpanded(!expanded)}
               >
-                {expanded ? "Hide details" : "Review request"}
+                {expanded ? t("hideDetails") : t("reviewRequest")}
               </InboxButton>
             ) : null}
             {expanded
@@ -264,7 +275,7 @@ export function InboxRow({
                     icon={action.behavior === "allow" ? "Check" : "X"}
                     onPress={() => onRespond(action)}
                   >
-                    {pending === action.id ? "Sending..." : action.label}
+                    {pending === action.id ? t("sending") : (action.label ?? t(action.behavior))}
                   </InboxButton>
                 ))
               : null}
@@ -276,7 +287,7 @@ export function InboxRow({
                 icon={inlineApproval ? "ArrowUpRight" : kind.icon}
                 onPress={onOpen}
               >
-                {card.kind === "approval" && !inlineApproval ? "Review request" : kind.action}
+                {card.kind === "approval" && !inlineApproval ? t("reviewRequest") : t(kind.action)}
               </InboxButton>
             ) : null}
             {!openRow ? <View style={{ marginLeft: "auto" }}>{readAction}</View> : null}

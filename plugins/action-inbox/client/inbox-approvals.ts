@@ -1,4 +1,9 @@
-export type ApprovalState = { pending: string; error: null } | { pending: null; error: string };
+import { InboxResponseError } from "./inbox-model";
+
+type ApprovalError = { key: InboxResponseError["key"] } | { detail: string };
+export type ApprovalState =
+  | { pending: string; error: null }
+  | { pending: null; error: ApprovalError };
 
 /** Approval operations belong to the screen, including when a row leaves the render window. */
 export function createApprovalStore() {
@@ -43,7 +48,10 @@ export function createApprovalStore() {
       } catch (failure) {
         set(key, {
           pending: null,
-          error: failure instanceof Error ? failure.message : String(failure),
+          error:
+            failure instanceof InboxResponseError
+              ? { key: failure.key }
+              : { detail: failure instanceof Error ? failure.message : String(failure) },
         });
       }
     },

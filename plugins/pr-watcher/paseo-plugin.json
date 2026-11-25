@@ -3,7 +3,7 @@
   "name": "PR watcher",
   "description": "Watch GitHub pull requests and wake their Paseo agents when checks or reviews change",
   "requirements": {
-    "paseo": ">=0.16.0-beta.1 <0.17.0"
+    "paseo": ">=0.16.0-beta.1"
   },
   "build": [
     [
@@ -19,5 +19,11 @@
   "media": [
     "docs/screenshots/workspace-watch-desktop.png",
     "docs/screenshots/workspace-watch-compact.png"
-  ]
+  ],
+  "translations": {
+    "zh-CN": {
+      "name": "拉取请求监视器",
+      "description": "监视 GitHub 拉取请求，在检查或审查发生变化时唤醒相关 Paseo 代理。"
+    }
+  }
 }
