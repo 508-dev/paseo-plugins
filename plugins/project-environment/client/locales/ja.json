@@ -83,5 +83,7 @@
   "destinationExists": "コピー先に同じ変数がすでにあります。",
   "sameDestination": "別のスコープを選んでください。",
   "sourceMissing": "コピー元の変数はもう利用できません。",
-  "destinationFull": "コピー先の変数が上限に達しました。"
+  "destinationFull": "コピー先の変数が上限に達しました。",
+  "pasteVariables": "変数を貼り付け",
+  "bulkSaved": "変数を保存しました。追加 {{added, number}} 件、更新 {{updated, number}} 件。"
 }

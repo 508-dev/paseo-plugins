@@ -18,6 +18,7 @@ import {
 } from "../shared/environment";
 import { VariableCard } from "./variable-card";
 import { ActionButton } from "./action-button";
+import { BulkEditor } from "./bulk-editor";
 import { Field } from "./field";
 import { EnvironmentEditor } from "./editor";
 
@@ -66,16 +67,32 @@ function ScopedEnvironment({
     queryKey: ["project-environment", host.id, workspaceId],
     queryFn: () => list({ workspaceId }),
   });
-  const [notice, setNotice] = useState("");
+  const [notice, setNotice] = useState<
+    { name: string } | { added: number; updated: number } | null
+  >(null);
   const invalidate = useCallback(async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["project-environment"] }),
       queryClient.invalidateQueries({ queryKey: ["project-environment-catalogue"] }),
     ]);
   }, [queryClient]);
+  const [bulk, setBulk] = useState(false);
+  const openBulk = useCallback(() => {
+    setNotice(null);
+    setBulk(true);
+  }, []);
+  const closeBulk = useCallback(() => setBulk(false), []);
+  const completeBulk = useCallback(
+    (added: number, updated: number) => {
+      setBulk(false);
+      setNotice({ added, updated });
+      void invalidate();
+    },
+    [invalidate],
+  );
   const saveExisting = useCallback(
     async (variable: z.infer<typeof variableInput>) => {
-      setNotice("");
+      setNotice(null);
       await save({ workspaceId, scope, variable });
       await invalidate();
     },
@@ -83,9 +100,9 @@ function ScopedEnvironment({
   );
   const removeExisting = useCallback(
     async (name: string) => {
-      setNotice("");
+      setNotice(null);
       await remove({ workspaceId, scope, name });
-      setNotice(name);
+      setNotice({ name });
       await invalidate();
     },
     [remove, workspaceId, scope, invalidate],
@@ -176,7 +193,7 @@ function ScopedEnvironment({
         <Text style={styles.subtitle}>{t("savedVariables")}</Text>
         {notice ? (
           <Text accessibilityRole="alert" style={styles.success}>
-            {t("removed", { name: notice })}
+            {"name" in notice ? t("removed", { name: notice.name }) : t("bulkSaved", notice)}
           </Text>
         ) : null}
         {variables.isPending ? <Text style={styles.detail}>{t("loading")}</Text> : null}
@@ -204,47 +221,67 @@ function ScopedEnvironment({
           ))}
       </View>
       <View style={styles.form}>
-        <Text style={styles.subtitle}>{t("addVariable")}</Text>
-        <Field
-          label={t("variableName")}
-          value={form.name}
-          placeholder="STRIPE_API_KEY"
-          onChangeText={setName}
-          theme={theme}
-          disabled={pending}
-        />
-        <Field
-          label={t("description")}
-          value={form.description}
-          placeholder={t("purpose")}
-          onChangeText={setDescription}
-          theme={theme}
-          disabled={pending}
-        />
-        <Field
-          label={t("value")}
-          value={form.value}
-          secure
-          onChangeText={setValue}
-          theme={theme}
-          disabled={pending}
-        />
-        <View style={styles.actions}>
-          <ActionButton
-            label={pending ? t("adding") : t("addVariable")}
-            onPress={submit}
+        <Text style={styles.subtitle}>{t(bulk ? "pasteVariables" : "addVariable")}</Text>
+        {bulk ? (
+          <BulkEditor
+            workspaceId={workspaceId}
+            scope={scope}
             theme={theme}
-            variant="primary"
-            disabled={pending || !variables.isSuccess}
+            savedVariables={savedVariables}
+            onSaved={completeBulk}
+            refreshSaved={invalidate}
+            onCancel={closeBulk}
           />
-        </View>
-        {form.message ? (
-          <Text accessibilityRole="alert" style={messageStyle}>
-            {typeof form.message === "string"
-              ? t(form.message)
-              : t("added", { name: form.message.name })}
-          </Text>
-        ) : null}
+        ) : (
+          <>
+            <Field
+              label={t("variableName")}
+              value={form.name}
+              placeholder="STRIPE_API_KEY"
+              onChangeText={setName}
+              theme={theme}
+              disabled={pending}
+            />
+            <Field
+              label={t("description")}
+              value={form.description}
+              placeholder={t("purpose")}
+              onChangeText={setDescription}
+              theme={theme}
+              disabled={pending}
+            />
+            <Field
+              label={t("value")}
+              value={form.value}
+              secure
+              onChangeText={setValue}
+              theme={theme}
+              disabled={pending}
+            />
+            <View style={styles.actions}>
+              <ActionButton
+                label={pending ? t("adding") : t("addVariable")}
+                onPress={submit}
+                theme={theme}
+                variant="primary"
+                disabled={pending || !variables.isSuccess}
+              />
+              <ActionButton
+                label={t("pasteVariables")}
+                onPress={openBulk}
+                theme={theme}
+                disabled={pending || !variables.isSuccess}
+              />
+            </View>
+            {form.message ? (
+              <Text accessibilityRole="alert" style={messageStyle}>
+                {typeof form.message === "string"
+                  ? t(form.message)
+                  : t("added", { name: form.message.name })}
+              </Text>
+            ) : null}
+          </>
+        )}
       </View>
       <Text style={styles.detail}>{t("environmentPrivacy")}</Text>
     </ScrollView>

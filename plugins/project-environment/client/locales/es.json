@@ -87,5 +87,7 @@
   "destinationExists": "La variable ya existe en el destino.",
   "sameDestination": "Elige un ámbito distinto.",
   "sourceMissing": "La variable de origen ya no está disponible.",
-  "destinationFull": "El destino alcanzó el límite de variables."
+  "destinationFull": "El destino alcanzó el límite de variables.",
+  "pasteVariables": "Pegar variables",
+  "bulkSaved": "Variables guardadas. Añadidas: {{added, number}}. Actualizadas: {{updated, number}}."
 }

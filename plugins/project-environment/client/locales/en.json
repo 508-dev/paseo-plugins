@@ -85,5 +85,7 @@
   "destinationExists": "This variable already exists in the destination.",
   "sameDestination": "Choose a different scope.",
   "sourceMissing": "The source variable is no longer available.",
-  "destinationFull": "The destination has reached its variable limit."
+  "destinationFull": "The destination has reached its variable limit.",
+  "pasteVariables": "Paste variables",
+  "bulkSaved": "Variables saved. {{added, number}} added, {{updated, number}} updated."
 }

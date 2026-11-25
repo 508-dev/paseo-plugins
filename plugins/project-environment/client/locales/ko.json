@@ -83,5 +83,7 @@
   "destinationExists": "복사 대상에 이 변수가 이미 있습니다.",
   "sameDestination": "다른 범위를 선택하세요.",
   "sourceMissing": "원본 변수를 더 이상 사용할 수 없습니다.",
-  "destinationFull": "복사 대상의 변수 개수가 한도에 도달했습니다."
+  "destinationFull": "복사 대상의 변수 개수가 한도에 도달했습니다.",
+  "pasteVariables": "변수 붙여넣기",
+  "bulkSaved": "변수를 저장했습니다. {{added, number}}개 추가, {{updated, number}}개 수정."
 }

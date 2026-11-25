@@ -83,5 +83,7 @@
   "destinationExists": "目标中已存在此变量。",
   "sameDestination": "请选择其他作用域。",
   "sourceMissing": "源变量已不可用。",
-  "destinationFull": "目标已达到变量数量上限。"
+  "destinationFull": "目标已达到变量数量上限。",
+  "pasteVariables": "粘贴变量",
+  "bulkSaved": "变量已保存。已添加 {{added, number}} 项，已更新 {{updated, number}} 项。"
 }

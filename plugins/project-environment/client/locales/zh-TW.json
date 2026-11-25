@@ -83,5 +83,7 @@
   "destinationExists": "目的地已有此變數。",
   "sameDestination": "請選擇其他範圍。",
   "sourceMissing": "來源變數已無法使用。",
-  "destinationFull": "目的地已達到變數數量上限。"
+  "destinationFull": "目的地已達到變數數量上限。",
+  "pasteVariables": "貼上變數",
+  "bulkSaved": "變數已儲存。已新增 {{added, number}} 項，已更新 {{updated, number}} 項。"
 }
