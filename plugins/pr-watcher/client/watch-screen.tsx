@@ -1,4 +1,5 @@
-import { useRpc, type PluginScreenProps } from "@getpaseo/plugin/client";
+import { messages } from "./messages.js";
+import { useTranslation, useRpc, type PluginScreenProps } from "@getpaseo/plugin/client";
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import {
@@ -13,12 +14,15 @@ import { watchChanged } from "./watch-events.js";
 type Watch = z.infer<typeof watchSchema>;
 
 export function WatchScreen({ theme, layout }: PluginScreenProps) {
+  const { t, locale } = useTranslation(messages);
   const list = useRpc(listWatches);
   const remove = useRpc(removeWatch);
   const resolve = useRpc(resolveUncertain);
   const [watches, setWatches] = useState<Watch[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ key: "loadError" | "actionError"; detail: string } | null>(
+    null,
+  );
   const [busy, setBusy] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -27,7 +31,10 @@ export function WatchScreen({ theme, layout }: PluginScreenProps) {
       setWatches(result.watches);
       setError(null);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not load watches.");
+      setError({
+        key: "loadError",
+        detail: cause instanceof Error ? cause.message : String(cause),
+      });
     } finally {
       setLoading(false);
     }
@@ -46,7 +53,10 @@ export function WatchScreen({ theme, layout }: PluginScreenProps) {
       watchChanged();
       await refresh();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Action failed.");
+      setError({
+        key: "actionError",
+        detail: cause instanceof Error ? cause.message : String(cause),
+      });
     } finally {
       setBusy(null);
     }
@@ -62,18 +72,13 @@ export function WatchScreen({ theme, layout }: PluginScreenProps) {
       style={{ flex: 1, backgroundColor: theme.colors.surface0 }}
       contentContainerStyle={{ padding, gap: 12 }}
     >
-      <Text style={{ color: foreground, fontSize: 20, fontWeight: "600" }}>
-        Watched pull requests
-      </Text>
-      <Text style={{ color: muted }}>
-        Use Watch PR in a workspace header or agent tab to detect its pull request and choose who
-        receives follow-ups. You can also use /watch-pr with a GitHub PR URL in an agent chat.
-      </Text>
-      {loading ? <Text style={{ color: muted }}>Loading…</Text> : null}
-      {error ? <Text style={{ color: foreground }}>{error}</Text> : null}
-      {!loading && watches.length === 0 ? (
-        <Text style={{ color: muted }}>No pull requests are being watched on this host.</Text>
+      <Text style={{ color: foreground, fontSize: 20, fontWeight: "600" }}>{t("watched")}</Text>
+      <Text style={{ color: muted }}>{t("instruction")}</Text>
+      {loading ? <Text style={{ color: muted }}>{t("loading")}</Text> : null}
+      {error ? (
+        <Text style={{ color: foreground }}>{t(error.key, { detail: error.detail })}</Text>
       ) : null}
+      {!loading && watches.length === 0 ? <Text style={{ color: muted }}>{t("empty")}</Text> : null}
       {watches.map((watch) => (
         <View
           key={watch.id}
@@ -83,18 +88,19 @@ export function WatchScreen({ theme, layout }: PluginScreenProps) {
             {watch.repository}#{watch.number}
           </Text>
           <Text style={{ color: muted }}>
-            Agent {watch.agentId} · {watch.status} · {watch.followupsSent}/5 follow-ups
+            {t("agent", { id: watch.agentId })} · {t(watch.status)} ·{" "}
+            {t("followups", { count: watch.followupsSent, limit: 5 })}
           </Text>
           {watch.lastPollAt ? (
             <Text style={{ color: muted }}>
-              Last checked {new Date(watch.lastPollAt).toLocaleString()}
+              {t("checked", { date: new Date(watch.lastPollAt).toLocaleString(locale) })}
             </Text>
           ) : null}
           {watch.lastError ? <Text style={{ color: foreground }}>{watch.lastError}</Text> : null}
           {watch.status === "uncertain" ? (
             <View style={{ gap: 8, flexDirection: layout.compact ? "column" : "row" }}>
               <Action
-                label="Mark handled"
+                label={t("handled")}
                 disabled={busy === watch.id}
                 onPress={() =>
                   void run(watch.id, () => resolve({ id: watch.id, action: "mark_sent" }))
@@ -102,7 +108,7 @@ export function WatchScreen({ theme, layout }: PluginScreenProps) {
                 color={theme.colors.accent}
               />
               <Action
-                label="Retry (may duplicate)"
+                label={t("retry")}
                 disabled={busy === watch.id}
                 onPress={() => void run(watch.id, () => resolve({ id: watch.id, action: "retry" }))}
                 color={theme.colors.accent}
@@ -110,7 +116,7 @@ export function WatchScreen({ theme, layout }: PluginScreenProps) {
             </View>
           ) : null}
           <Action
-            label="Remove watch"
+            label={t("remove")}
             disabled={busy === watch.id}
             onPress={() => void run(watch.id, () => remove({ id: watch.id }))}
             color={theme.colors.accent}
@@ -118,7 +124,7 @@ export function WatchScreen({ theme, layout }: PluginScreenProps) {
         </View>
       ))}
       <Action
-        label="Refresh"
+        label={t("refresh")}
         disabled={loading}
         onPress={() => void refresh()}
         color={theme.colors.accent}

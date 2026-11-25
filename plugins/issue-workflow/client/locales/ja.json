@@ -1,0 +1,17 @@
+{
+  "issue": "GitHub Issue",
+  "openIssue": "GitHub Issue を開く",
+  "attachIssue": "GitHub Issue を添付",
+  "searchIssues": "番号またはタイトルで Issue を検索",
+  "loading": "読み込み中…",
+  "loadError": "関連する Issue を読み込めませんでした: {{detail}}",
+  "noIssue": "このワークスペースに関連する GitHub Issue はありません。",
+  "branch": "ブランチ: {{name}}",
+  "detached": "分離 HEAD",
+  "pullRequest": "プルリクエスト",
+  "pullRequestError": "プルリクエストを読み込めませんでした: {{detail}}",
+  "noPullRequest": "このブランチのプルリクエストは見つかりませんでした。",
+  "open": "オープン",
+  "closed": "クローズ",
+  "merged": "マージ済み"
+}

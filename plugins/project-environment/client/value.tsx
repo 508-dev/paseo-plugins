@@ -1,3 +1,4 @@
+import { messages } from "./messages";
 import {
   useCallback,
   useEffect,
@@ -8,7 +9,7 @@ import {
 } from "react";
 import { AppState, Text, View } from "react-native";
 import type { PluginTheme } from "@getpaseo/plugin";
-import { useRpc } from "@getpaseo/plugin/client";
+import { useTranslation, useRpc } from "@getpaseo/plugin/client";
 import { copyText } from "@getpaseo/plugin/client/ui";
 import { readVariableValue, type VariableTarget } from "../shared/environment";
 import { ActionButton } from "./action-button";
@@ -31,6 +32,7 @@ export function ValueControls({
   theme,
   children,
 }: ValueControlsProps) {
+  const { t } = useTranslation(messages);
   const read = useRpc(readVariableValue);
   const [controller] = useState(
     () =>
@@ -98,14 +100,14 @@ export function ValueControls({
           {name}
         </Text>
         <ActionButton
-          label={`${revealed ? "Hide" : "Reveal"} value for ${name}`}
+          label={t(revealed ? "hideValueFor" : "revealValueFor", { name })}
           icon={revealed ? "EyeOff" : "Eye"}
           disabled={busy}
           onPress={reveal}
           theme={theme}
         />
         <ActionButton
-          label={`Copy value for ${name}`}
+          label={t("copyValueFor", { name })}
           icon="Clipboard"
           disabled={busy}
           onPress={copy}
@@ -120,7 +122,7 @@ export function ValueControls({
       ) : null}
       {state.message ? (
         <Text accessibilityRole="alert" style={messageStyle}>
-          {state.message}
+          {t(state.message)}
         </Text>
       ) : null}
       <CopyDestination name={name} source={target} hostId={hostId} theme={theme}>

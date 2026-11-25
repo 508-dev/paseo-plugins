@@ -1,0 +1,17 @@
+{
+  "issue": "GitHub 议题",
+  "openIssue": "打开 GitHub 议题",
+  "attachIssue": "附加 GitHub 议题",
+  "searchIssues": "按编号或标题搜索议题",
+  "loading": "正在加载…",
+  "loadError": "无法加载关联的议题：{{detail}}",
+  "noIssue": "此工作区未关联 GitHub 议题。",
+  "branch": "分支：{{name}}",
+  "detached": "分离的 HEAD",
+  "pullRequest": "拉取请求",
+  "pullRequestError": "无法加载拉取请求：{{detail}}",
+  "noPullRequest": "此分支没有拉取请求。",
+  "open": "未关闭",
+  "closed": "已关闭",
+  "merged": "已合并"
+}

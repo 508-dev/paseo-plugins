@@ -1,5 +1,6 @@
 {
   "id": "github-issue-workflow",
+  "name": "GitHub issue workflow",
   "description": "Start Paseo workspaces from GitHub issues",
   "requirements": {
     "paseo": ">=0.16.0-beta.1"
@@ -14,5 +15,12 @@
       "--no-audit",
       "--no-fund"
     ]
-  ]
+  ],
+  "name": "GitHub issue workflow",
+  "translations": {
+    "zh-CN": {
+      "name": "GitHub 议题工作流",
+      "description": "从 GitHub 议题创建 Paseo 工作区。"
+    }
+  }
 }

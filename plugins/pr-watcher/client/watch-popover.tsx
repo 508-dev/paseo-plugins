@@ -1,4 +1,6 @@
+import { messages } from "./messages.js";
 import {
+  useTranslation,
   useAgent,
   useAgents,
   useComposers,
@@ -45,6 +47,7 @@ export function WatchPopover(props: WatchPopoverProps) {
 }
 
 function WorkspaceWatchForm(props: WatchPopoverProps) {
+  const { t } = useTranslation(messages);
   const { workspaceId, host, theme } = props;
   const workspaceBranch = useWorkspace(workspaceId, ({ branch }) => branch);
   const agentRefs = useAgents({
@@ -130,7 +133,7 @@ function WorkspaceWatchForm(props: WatchPopoverProps) {
   const foreground = { color: theme.colors.foreground };
   const muted = { color: theme.colors.foregroundMuted, fontSize: 13 };
   const sectionLabel = { ...foreground, fontSize: 13, fontWeight: "600" as const };
-  const title = configuring ? "Watch a pull request" : "Watched pull requests";
+  const title = configuring ? t("configure") : t("watched");
 
   return (
     <View
@@ -147,21 +150,29 @@ function WorkspaceWatchForm(props: WatchPopoverProps) {
         {configuring && workspaceWatches.length > 0 ? (
           <TextAction
             theme={theme}
-            label="Back"
+            label={t("back")}
             disabled={busy}
             onPress={() => setSetupRequested(false)}
           />
         ) : null}
-        <TextAction theme={theme} label="Refresh" disabled={busy || loading} onPress={refresh} />
+        <TextAction
+          theme={theme}
+          label={t("refresh")}
+          disabled={busy || loading}
+          onPress={refresh}
+        />
       </View>
       {error ? (
         <Text accessibilityRole="alert" style={{ color: theme.colors.statusDanger }}>
-          {error.message}
+          {t(
+            mutation.error ? "actionError" : discoveryQuery.error ? "discoveryError" : "loadError",
+            { detail: error.message },
+          )}
         </Text>
       ) : null}
       {configuring ? (
         <>
-          <Text style={muted}>Follow up on check failures, reviews, and merge conflicts.</Text>
+          <Text style={muted}>{t("hint")}</Text>
           <View style={{ gap: 2 }}>
             <View
               style={{
@@ -171,11 +182,11 @@ function WorkspaceWatchForm(props: WatchPopoverProps) {
                 gap: 8,
               }}
             >
-              <Text style={sectionLabel}>Pull request</Text>
+              <Text style={sectionLabel}>{t("pullRequest")}</Text>
               {candidates.length > 0 || !manual ? (
                 <TextAction
                   theme={theme}
-                  label={manual ? "Use detected PRs" : "Enter URL"}
+                  label={manual ? t("useDetected") : t("enterUrl")}
                   disabled={busy}
                   onPress={() => setPrSource(manual ? "detected" : "url")}
                 />
@@ -186,12 +197,12 @@ function WorkspaceWatchForm(props: WatchPopoverProps) {
                 accessibilityRole="alert"
                 style={{ ...muted, color: theme.colors.statusWarning }}
               >
-                {discovery.error}
+                {t("discoveryError", { detail: discovery.error })}
               </Text>
             ) : null}
             {manual ? (
               <TextInput
-                accessibilityLabel="GitHub pull request URL"
+                accessibilityLabel={t("url")}
                 placeholder="https://github.com/owner/repo/pull/123"
                 placeholderTextColor={theme.colors.foregroundMuted}
                 autoCapitalize="none"
@@ -213,11 +224,9 @@ function WorkspaceWatchForm(props: WatchPopoverProps) {
               />
             ) : (
               <>
-                {loading && !candidates.length ? (
-                  <Text style={muted}>Finding pull requests…</Text>
-                ) : null}
+                {loading && !candidates.length ? <Text style={muted}>{t("finding")}</Text> : null}
                 {!loading && discovery && !discovery.error && !candidates.length ? (
-                  <Text style={muted}>No open pull request found for this branch.</Text>
+                  <Text style={muted}>{t("noOpen")}</Text>
                 ) : null}
                 {candidates.map((pr) => (
                   <SelectionRow
@@ -242,18 +251,18 @@ function WorkspaceWatchForm(props: WatchPopoverProps) {
                 gap: 8,
               }}
             >
-              <Text style={sectionLabel}>Send follow-ups to</Text>
+              <Text style={sectionLabel}>{t("recipient")}</Text>
               {recipient && agentRefs.length > 1 ? (
                 <TextAction
                   theme={theme}
-                  label={choosingAgent ? "Done" : "Change agent"}
+                  label={choosingAgent ? t("done") : t("changeAgent")}
                   disabled={busy}
                   onPress={() => setChoosingAgent(!choosingAgent)}
                 />
               ) : null}
             </View>
             {agentRefs.length === 0 ? (
-              <Text style={muted}>Open an agent in this workspace to start watching.</Text>
+              <Text style={muted}>{t("noAgent")}</Text>
             ) : recipient && !choosingAgent ? (
               <AgentChoice id={recipient.id} theme={theme} />
             ) : (
@@ -275,7 +284,7 @@ function WorkspaceWatchForm(props: WatchPopoverProps) {
           <WatchAction
             theme={theme}
             primary
-            label={busy ? "Starting watch…" : alreadyWatching ? "Already watching" : "Watch PR"}
+            label={busy ? t("starting") : alreadyWatching ? t("already") : t("watch")}
             disabled={
               busy || loading || !discovery || !recipient || !pullRequest || alreadyWatching
             }
@@ -307,7 +316,7 @@ function WorkspaceWatchForm(props: WatchPopoverProps) {
           ))}
           <WatchAction
             theme={theme}
-            label="Add a watch"
+            label={t("add")}
             disabled={busy}
             onPress={() => setSetupRequested(true)}
           />
@@ -408,11 +417,12 @@ function AgentChoice({
   id,
   ...props
 }: Omit<SelectionRowProps, "title" | "detail"> & { id: string }) {
+  const { t } = useTranslation(messages);
   const agent = useAgent(id, ({ title, provider }) => ({ title, provider }));
   return (
     <SelectionRow
       {...props}
-      title={agent?.title ?? `Agent ${id.slice(0, 8)}`}
+      title={agent?.title ?? t("agent", { id: id.slice(0, 8) })}
       detail={agent?.provider}
     />
   );
@@ -431,6 +441,7 @@ function WatchDetails({
   onRemove(): void;
   onResolve(action: "mark_sent" | "retry"): void;
 }) {
+  const { t, locale } = useTranslation(messages);
   const agent = useAgent(watch.agentId, ({ title }) => title);
   return (
     <View style={{ gap: 8, borderTopWidth: 1, borderColor: theme.colors.border, paddingTop: 12 }}>
@@ -438,20 +449,19 @@ function WatchDetails({
         {watch.repository}#{watch.number}
       </ExternalLink>
       <Text style={{ color: theme.colors.foreground }}>
-        {watch.status === "watching" ? "Watching" : watch.status} ·{" "}
-        {agent ?? watch.agentId.slice(0, 8)}
+        {t(watch.status)} · {agent ?? watch.agentId.slice(0, 8)}
       </Text>
       <Text style={{ color: theme.colors.foregroundMuted }}>
-        {watch.followupsSent}/5 follow-ups sent
+        {t("followups", { count: watch.followupsSent, limit: 5 })}
       </Text>
       {watch.lastPollAt ? (
         <Text style={{ color: theme.colors.foregroundMuted }}>
-          Last checked {new Date(watch.lastPollAt).toLocaleString()}
+          {t("checked", { date: new Date(watch.lastPollAt).toLocaleString(locale) })}
         </Text>
       ) : null}
       {watch.lastSentAt ? (
         <Text style={{ color: theme.colors.foregroundMuted }}>
-          Last follow-up {new Date(watch.lastSentAt).toLocaleString()}
+          {t("lastFollowup", { date: new Date(watch.lastSentAt).toLocaleString(locale) })}
         </Text>
       ) : null}
       {watch.lastError ? (
@@ -461,19 +471,19 @@ function WatchDetails({
         <>
           <WatchAction
             theme={theme}
-            label="Mark handled"
+            label={t("handled")}
             disabled={busy}
             onPress={() => onResolve("mark_sent")}
           />
           <WatchAction
             theme={theme}
-            label="Retry (may duplicate)"
+            label={t("retry")}
             disabled={busy}
             onPress={() => onResolve("retry")}
           />
         </>
       ) : null}
-      <WatchAction theme={theme} label="Stop watching" disabled={busy} onPress={onRemove} />
+      <WatchAction theme={theme} label={t("stop")} disabled={busy} onPress={onRemove} />
     </View>
   );
 }

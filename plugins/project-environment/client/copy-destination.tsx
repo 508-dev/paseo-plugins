@@ -1,6 +1,6 @@
 import { type ReactNode, useCallback, useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
-import { useRpc } from "@getpaseo/plugin/client";
+import { useRpc, useTranslation } from "@getpaseo/plugin/client";
 import { Icon } from "@getpaseo/plugin/client/ui";
 import type { PluginTheme } from "@getpaseo/plugin";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -13,14 +13,15 @@ import {
 } from "../shared/environment";
 import { ActionButton } from "./action-button";
 import { Field } from "./field";
+import { messages } from "./messages";
 
 type Destination = z.infer<typeof variableDestinations.output>["destinations"][number];
 const PAGE_SIZE = 6;
-const failures: Partial<Record<CopyStatus, string>> = {
-  "same-scope": "Choose a different scope.",
-  missing: "The source variable is no longer available.",
-  full: "The destination has reached its variable limit.",
-};
+const failures = {
+  "same-scope": "sameDestination",
+  missing: "sourceMissing",
+  full: "destinationFull",
+} as const satisfies Record<Exclude<CopyStatus, "copied" | "overwritten" | "exists">, string>;
 
 export function CopyDestination({
   name,
@@ -35,6 +36,7 @@ export function CopyDestination({
   theme: PluginTheme;
   children?: ReactNode;
 }) {
+  const { t } = useTranslation(messages);
   const list = useRpc(variableDestinations);
   const copy = useRpc(copyVariable);
   const queryClient = useQueryClient();
@@ -153,20 +155,21 @@ export function CopyDestination({
       return terms.every((term) => text.includes(term));
     }) ?? [];
   const status = transfer.data?.status;
-  const error = transfer.isError
-    ? "Could not copy the variable. Try again."
-    : status && failures[status];
   const completed = status === "copied" || status === "overwritten";
+  let error = transfer.isError ? t("transferError") : "";
+  if (status && !completed && status !== "exists") error = t(failures[status]);
+  const actionLabel = requiresOverwrite ? t("overwriteVariable") : t("copyVariable");
 
   if (!open)
     return (
       <View style={styles.actions}>
-        <ActionButton label="Copy to…" onPress={show} theme={theme} />
+        <ActionButton label={t("copyTo")} onPress={show} theme={theme} />
         {children}
         {completed && destination ? (
           <Text accessibilityRole="alert" style={styles.success}>
-            {status === "overwritten" ? "Overwrote the variable in" : "Copied to"}{" "}
-            {destination.label}.
+            {t(status === "overwritten" ? "overwrittenTo" : "copiedTo", {
+              destination: destination.label,
+            })}
           </Text>
         ) : null}
       </View>
@@ -175,9 +178,9 @@ export function CopyDestination({
   return (
     <View style={styles.panel}>
       <View style={styles.heading}>
-        <Text style={styles.headingText}>Copy {name}</Text>
+        <Text style={styles.headingText}>{t("copyNameTo", { name })}</Text>
         <ActionButton
-          label="Cancel copy"
+          label={t("cancelCopy")}
           icon="X"
           onPress={cancel}
           theme={theme}
@@ -190,8 +193,8 @@ export function CopyDestination({
             <Text style={styles.title}>{destination.label}</Text>
             <Text style={styles.detail}>
               {destination.target.kind === "project"
-                ? "Project defaults"
-                : [destination.projectName, "Workspace variables"].filter(Boolean).join(" · ")}
+                ? t("projectDefaults")
+                : [destination.projectName, t("workspaceVariables")].filter(Boolean).join(" · ")}
             </Text>
             <Text selectable style={styles.detail}>
               {destination.directory}
@@ -199,19 +202,19 @@ export function CopyDestination({
           </View>
           {requiresOverwrite ? (
             <Text accessibilityRole="alert" style={styles.detail}>
-              {name} already exists here. Overwriting replaces its saved value and description.
+              {t("destinationExists")}
             </Text>
           ) : null}
           <View style={styles.actions}>
             <ActionButton
-              label={requiresOverwrite ? "Overwrite variable" : "Copy variable"}
+              label={isPending ? t("copying") : actionLabel}
               onPress={confirm}
               theme={theme}
               variant={requiresOverwrite ? "destructive" : "primary"}
               disabled={isPending}
             />
             <ActionButton
-              label="Change destination"
+              label={t("changeDestination")}
               onPress={changeDestination}
               theme={theme}
               disabled={isPending}
@@ -222,14 +225,14 @@ export function CopyDestination({
         <>
           <View style={styles.actions}>
             <ActionButton
-              label="Projects"
+              label={t("destinationProjects")}
               onPress={showProjects}
               theme={theme}
               selected={scope === "project"}
               variant={scope === "project" ? "primary" : "outline"}
             />
             <ActionButton
-              label="Workspaces"
+              label={t("destinationWorkspaces")}
               onPress={showWorkspaces}
               theme={theme}
               selected={scope === "workspace"}
@@ -237,20 +240,22 @@ export function CopyDestination({
             />
           </View>
           <Field
-            label={scope === "project" ? "Search projects" : "Search workspaces"}
+            label={t(scope === "project" ? "searchProjects" : "searchWorkspaces")}
             value={query}
             onChangeText={search}
             theme={theme}
           />
-          {destinations.isPending ? <Text style={styles.detail}>Loading destinations…</Text> : null}
+          {destinations.isPending ? (
+            <Text style={styles.detail}>{t("loadingDestinations")}</Text>
+          ) : null}
           {destinations.isError ? (
             <>
-              <Text style={styles.error}>Could not load destinations.</Text>
-              <ActionButton label="Retry" onPress={retry} theme={theme} />
+              <Text style={styles.error}>{t("loadDestinationsError")}</Text>
+              <ActionButton label={t("retry")} onPress={retry} theme={theme} />
             </>
           ) : null}
           {destinations.isSuccess && !matches.length ? (
-            <Text style={styles.detail}>No matching destinations.</Text>
+            <Text style={styles.detail}>{t("noDestinations")}</Text>
           ) : null}
           {matches.length ? (
             <View style={styles.results}>
@@ -271,7 +276,7 @@ export function CopyDestination({
           ) : null}
           {matches.length > visible ? (
             <View style={styles.more}>
-              <ActionButton label="Show more" onPress={showMore} theme={theme} />
+              <ActionButton label={t("showMoreDestinations")} onPress={showMore} theme={theme} />
             </View>
           ) : null}
         </>

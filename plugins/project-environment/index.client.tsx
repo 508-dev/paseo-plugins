@@ -1,3 +1,4 @@
+import { messages } from "./client/messages";
 import type {
   PluginClientContext,
   PluginScreenProps,
@@ -41,15 +42,19 @@ export default function contribute(client: PluginClientContext) {
       />
     );
   }
-  client.addScreen({ id: "variables", title: "Environment variables", Component: CatalogueScreen });
+  client.addScreen({
+    id: "variables",
+    title: messages.message("variables"),
+    Component: CatalogueScreen,
+  });
   client.addSidebarHeaderItem({
     id: "variables",
-    title: "Environment variables",
+    title: messages.message("variables"),
     Component: CatalogueSidebarItem,
   });
   client.addCommandCenterItem({
     id: "search-variables",
-    title: "Search environment variables",
+    title: messages.message("searchEnvironment"),
     icon: "Search",
     context: "global",
     onSelect({ openScreen }) {
@@ -58,14 +63,14 @@ export default function contribute(client: PluginClientContext) {
   });
   client.addWorkspacePanel({
     id: "environment",
-    title: "Environment",
+    title: messages.message("environment"),
     icon: "KeyRound",
     context: "workspace",
     Component: EnvironmentPanel,
   });
   client.addCommandCenterItem({
     id: "open-environment",
-    title: "Project environment",
+    title: messages.message("projectEnvironment"),
     icon: "KeyRound",
     context: "workspace",
     onSelect({ openPanel }) {
