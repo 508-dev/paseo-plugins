@@ -1,0 +1,6 @@
+{
+  "id": "latest-turn-changes",
+  "name": "Latest turn changes",
+  "description": "Review the Git worktree changes during an agent’s latest settled turn.",
+  "requirements": { "paseo": ">=0.17.0-beta.1" }
+}

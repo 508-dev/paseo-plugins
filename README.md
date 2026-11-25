@@ -13,6 +13,8 @@ Paseo plugins maintained by [508.dev](https://508.dev). Each plugin is installed
 | [Suggested replies](plugins/replies)               | Suggest replies you can edit before sending                       | >=0.16.0-beta.2   |
 | [Worktree include](plugins/worktreeinclude)        | Copy or symlink gitignored files into new worktrees               | >=0.10.3          |
 
+[Latest turn changes](plugins/latest-turn-changes) is an installable preview for Paseo 0.17.0-beta.1 and later.
+
 ## Install
 
 Enable plugins in Paseo Settings on the target host, then choose a plugin:
