@@ -46,7 +46,7 @@ function openingSentence(message: string): string | null {
       .replace(/\*\*|__|`/g, "")
       .replace(/\s+/g, " ")
       .trim();
-    for (const sentence of plain.split(/(?<=[.!?])\s+/)) {
+    for (const sentence of plain.split(/(?<=[.!?])\s+|(?<=[。！？])(?![。！？])\s*/)) {
       if (
         !sentence ||
         /^(?:done|sure|okay|ok|summary|update|progress|results?)[:.!]*$/i.test(sentence)

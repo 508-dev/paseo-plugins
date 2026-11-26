@@ -90,6 +90,15 @@ describe("latest progress previews", () => {
     );
   });
 
+  it.each([
+    ["移行が完了しました。次にテストを追加します。", "移行が完了しました。"],
+    ["测试通过！接下来发布。", "测试通过！"],
+    ["測試通過了嗎？接下來會確認。", "測試通過了嗎？"],
+    ["Updated to v1.2. Next, run tests.", "Updated to v1.2."],
+  ])("selects the first sentence from %s", (message, expected) => {
+    expect(latestProgress([assistant(message)])).toBe(expected);
+  });
+
   it("joins wrapped sentences while keeping separate paragraphs, headings, and code blocks apart", () => {
     expect(
       latestProgress([
