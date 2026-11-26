@@ -20,7 +20,8 @@
     "server/",
     "shared/",
     "LICENSE",
-    "OVERVIEW.md"
+    "OVERVIEW.md",
+    "OVERVIEW.*.md"
   ],
   "type": "module",
   "publishConfig": {

@@ -4,7 +4,7 @@ A [Paseo](https://paseo.sh) plugin by [508.dev](https://508.dev) that attaches a
 
 ## Install
 
-Requires Paseo 0.9 or newer with plugins enabled. Plugins are trusted, unsandboxed code: review this repository and its updates before installing.
+Requires Paseo 0.13.0 or newer with plugins enabled. Plugins are trusted, unsandboxed code: review this repository and its updates before installing.
 
 ```sh
 paseo plugin add git:508-dev/paseo-plugins:plugins/agent-context
@@ -18,7 +18,7 @@ The plugin runs on the daemon that owns the source agents and searches that host
 
 The plugin reads retained agent timelines and produces snapshots **when the picker searches**, not at prompt submission. Selecting a result attaches the snapshot returned by that search. The response carries snapshot text to the Paseo app, which stores it with the draft and later sends it to the destination daemon as a prompt attachment. Do not use it for material you would not send to a model or store in a local draft.
 
-Paseo 0.9.1 accepts the snapshot as an ordinary text attachment through the `+` menu. The New Agent shortcut and dedicated `chat_history` ordering require a newer client that supports `newAgentShortcut` and `contextKind`. The plugin declares both fields now; older clients ignore them while retaining basic attachment behavior.
+Paseo 0.13.0 accepts the snapshot as an ordinary text attachment through the `+` menu. The New Agent shortcut and dedicated `chat_history` ordering require a newer client that supports `newAgentShortcut` and `contextKind`. The plugin declares both fields now; older clients ignore them while retaining basic attachment behavior.
 
 Snapshots include user and assistant messages and fixed tool-kind markers. They omit reasoning, raw tool inputs and outputs, provider tool names, and subagent logs. Each snapshot is capped at 128 KiB, keeps recent context when older context exceeds the cap, and marks omitted context in the text. Search scans up to 1,000 agents and reads at most 5,000 timeline items per candidate result. Inactive retained sessions may be hydrated while reading their timelines; no new agent turn starts.
 

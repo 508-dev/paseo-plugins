@@ -1,0 +1,17 @@
+{
+  "issue": "GitHub 議題",
+  "openIssue": "開啟 GitHub 議題",
+  "attachIssue": "附加 GitHub 議題",
+  "searchIssues": "依編號或標題搜尋議題",
+  "loading": "載入中…",
+  "loadError": "無法載入連結的議題：{{detail}}",
+  "noIssue": "此工作區未連結 GitHub 議題。",
+  "branch": "分支：{{name}}",
+  "detached": "分離的 HEAD",
+  "pullRequest": "提取要求",
+  "pullRequestError": "無法載入提取要求：{{detail}}",
+  "noPullRequest": "找不到此分支的提取要求。",
+  "open": "未關閉",
+  "closed": "已關閉",
+  "merged": "已合併"
+}

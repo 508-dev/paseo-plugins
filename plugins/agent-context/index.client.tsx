@@ -1,12 +1,28 @@
+import { defineAttachmentSource } from "@getpaseo/plugin";
 import type { PluginClientContext } from "@getpaseo/plugin/client";
 import { createDestinationRegistration } from "./client/destination";
+import { messages } from "./client/messages";
 import { TranscriptSearch } from "./client/transcript-search";
-import { agentTranscriptAttachments, searchTranscriptExcerptsRpc } from "./shared/agent-context";
+import {
+  agentTranscriptAttachmentSourceId,
+  searchAgentTranscriptsRpc,
+  searchTranscriptExcerptsRpc,
+} from "./shared/agent-context";
 
 const screenId = "transcript-search";
 
 export default function contribute(client: PluginClientContext) {
-  const removeSource = client.addAttachmentSource(agentTranscriptAttachments);
+  const removeSource = client.addAttachmentSource(
+    defineAttachmentSource({
+      id: agentTranscriptAttachmentSourceId,
+      title: messages.message("transcript"),
+      icon: "MessagesSquare",
+      pickerTitle: messages.message("attach"),
+      searchPlaceholder: messages.message("search"),
+      newAgentShortcut: true,
+      search: searchAgentTranscriptsRpc,
+    }),
+  );
   if (typeof client.addScreen !== "function") return removeSource;
 
   const destination = createDestinationRegistration();

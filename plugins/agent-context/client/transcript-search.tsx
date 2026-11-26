@@ -4,7 +4,7 @@ import * as ui from "@getpaseo/plugin/client/ui";
 import { useRef, useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import {
-  agentTranscriptAttachments,
+  agentTranscriptAttachmentSourceId,
   EXCERPT_AGENT_LIMIT,
   EXCERPT_TIMELINE_LIMIT,
   excerptQuerySchema,
@@ -60,7 +60,7 @@ export function TranscriptSearch({ host, theme, layout, params, search }: Props)
 
   async function attach(item: Excerpt) {
     const id = JSON.stringify([host.id, item.id]);
-    const sourceId = agentTranscriptAttachments.id;
+    const sourceId = agentTranscriptAttachmentSourceId;
     try {
       const composer = getDestination(params.destination)?.composer?.();
       if (!composer) {

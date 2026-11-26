@@ -11,7 +11,7 @@ interface EditorState {
   value: string;
   revision: number;
   status: "idle" | "pending" | "saved" | "error";
-  message: string;
+  message: "" | "invalidVariable" | "alreadyExists" | "saving" | "saveError" | { name: string };
 }
 
 export class EnvironmentEditor {
@@ -46,15 +46,14 @@ export class EnvironmentEditor {
     if (!result.success) {
       this.publish({
         status: "error",
-        message:
-          "Enter an uppercase variable name, a nonempty value (up to 16 KiB), and a description up to 500 characters.",
+        message: "invalidVariable",
       });
       return;
     }
     if (existingNames.includes(result.data.name)) {
       this.publish({
         status: "error",
-        message: "That variable already exists. Use Replace on its card.",
+        message: "alreadyExists",
       });
       return;
     }
@@ -62,7 +61,7 @@ export class EnvironmentEditor {
       status: "pending",
       value: "",
       revision: this.state.revision + 1,
-      message: "Saving…",
+      message: "saving",
     });
     try {
       await this.actions.save(result.data);
@@ -71,12 +70,12 @@ export class EnvironmentEditor {
         description: "",
         status: "saved",
         revision: this.state.revision + 1,
-        message: `${result.data.name} added. The next environment command will use it.`,
+        message: { name: result.data.name },
       });
     } catch {
       this.publish({
         status: "error",
-        message: "Could not save. Re-enter the value and try again.",
+        message: "saveError",
       });
     }
   }

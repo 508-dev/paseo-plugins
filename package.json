@@ -7,8 +7,8 @@
     "validate": "node scripts/validate.mjs",
     "typecheck": "node scripts/check-plugins.mjs typecheck",
     "lint": "oxlint --config .oxlintrc.json scripts && node scripts/check-plugins.mjs lint",
-    "format": "oxfmt README.md AGENTS.md docs scripts .github package.json plugins.json .oxfmtrc.json .oxlintrc.json plugins/*/package.json plugins/*/paseo-plugin.json plugins/*/README.md plugins/*/OVERVIEW.md",
-    "format:check": "oxfmt --check README.md AGENTS.md docs scripts .github package.json plugins.json .oxfmtrc.json .oxlintrc.json plugins/*/package.json plugins/*/paseo-plugin.json plugins/*/README.md plugins/*/OVERVIEW.md",
+    "format": "oxfmt README.md AGENTS.md docs scripts .github package.json plugins.json .oxfmtrc.json .oxlintrc.json plugins/*/package.json plugins/*/paseo-plugin.json plugins/*/README.md plugins/*/OVERVIEW*.md",
+    "format:check": "oxfmt --check README.md AGENTS.md docs scripts .github package.json plugins.json .oxfmtrc.json .oxlintrc.json plugins/*/package.json plugins/*/paseo-plugin.json plugins/*/README.md plugins/*/OVERVIEW*.md",
     "lint:collection": "oxlint --config .oxlintrc.json scripts",
     "format:files": "oxfmt"
   },

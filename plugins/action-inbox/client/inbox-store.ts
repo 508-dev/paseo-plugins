@@ -3,7 +3,7 @@ import { sortCards, type InboxCard } from "./inbox-model";
 
 export interface InboxSnapshot {
   cards: InboxCard[];
-  errors: string[];
+  errors: { hostId: string; host: string; detail: string }[];
   truncatedHosts: string[];
   loading: boolean;
   refreshing: boolean;
@@ -43,14 +43,16 @@ export function createInboxStore(loadHost: LoadHost) {
       const results = await Promise.allSettled(online.map(loadHost));
       if (version !== generation) return;
       const cards: InboxCard[] = [];
-      const errors: string[] = [];
+      const errors: { hostId: string; host: string; detail: string }[] = [];
       const truncatedHosts: string[] = [];
       results.forEach((result, index) => {
         const host = online[index];
         if (result.status === "rejected") {
-          errors.push(
-            `${host.label}: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`,
-          );
+          errors.push({
+            hostId: host.serverId,
+            host: host.label,
+            detail: result.reason instanceof Error ? result.reason.message : String(result.reason),
+          });
         } else {
           cards.push(...result.value.cards);
           if (result.value.truncated) truncatedHosts.push(host.label);

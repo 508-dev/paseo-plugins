@@ -1,10 +1,11 @@
 import {
-  defineAttachmentSource,
   defineRpc,
   PluginAttachmentItemSchema,
   PluginAttachmentSearchPayloadSchema,
 } from "@getpaseo/plugin";
 import { z } from "zod";
+
+export const agentTranscriptAttachmentSourceId = "agent-transcripts";
 
 export const searchAgentTranscriptsRpc = defineRpc({
   name: "agent-context.search",
@@ -25,14 +26,4 @@ export const searchTranscriptExcerptsRpc = defineRpc({
       .max(5),
     unavailable: z.number().int().nonnegative(),
   }),
-});
-
-export const agentTranscriptAttachments = defineAttachmentSource({
-  id: "agent-transcripts",
-  title: "agent transcript",
-  icon: "MessagesSquare",
-  pickerTitle: "Attach agent transcript",
-  searchPlaceholder: "Search agents",
-  newAgentShortcut: true,
-  search: searchAgentTranscriptsRpc,
 });

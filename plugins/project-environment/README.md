@@ -30,6 +30,17 @@ Git worktrees of the same repository inherit the same project defaults. To overr
 
 See the [project defaults](docs/qa/project-defaults-desktop.png) and [workspace override](docs/qa/workspace-override-compact.png) screenshots.
 
+## Paste variables in bulk
+
+Choose **Project defaults** or **Workspace variables**, then select **Paste variables** under **Add variable**. Paste one assignment per line. Review the new and existing names before saving.
+
+```dotenv
+ERPNEXT_API_SECRET=example
+ERPNEXT_BASE_URL=https://example.com
+```
+
+Blank lines and lines beginning with `#` are skipped. Everything after the first `=` is saved literally, including quotes, spaces, and additional equals signs. Pasted text is visible in the editor. Matching names in the selected scope are overwritten and keep their descriptions. Check **Protect existing values** to block the batch until you remove any matching names from the paste. Invalid lines and duplicate names within the paste block the whole batch.
+
 ## Find variables across projects
 
 Open **Environment variables** from the sidebar, or choose **Search environment variables** in the Command Center. Search by name or description to find matching variables across projects and workspaces on the selected host. Values are excluded from the search response and are never used for matching.

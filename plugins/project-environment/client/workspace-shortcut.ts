@@ -1,7 +1,12 @@
-import type { PluginButtonRegistration, PluginClientContext } from "@getpaseo/plugin/client";
+import type {
+  PluginButtonRegistration,
+  PluginClientContext,
+  PluginText,
+} from "@getpaseo/plugin/client";
+import { messages } from "./messages";
 
 export function addWorkspaceShortcuts(client: PluginClientContext) {
-  const buttons = new Map<string, PluginButtonRegistration>();
+  const buttons = new Map<string, PluginButtonRegistration<PluginText>>();
   let stopped = false;
   let generation = 0;
   let release: (() => void) | undefined;
@@ -20,7 +25,7 @@ export function addWorkspaceShortcuts(client: PluginClientContext) {
         id: "environment",
         workspaceId,
         button: {
-          title: "Environment variables",
+          title: messages.message("variables"),
           icon: "KeyRound",
           behavior: {
             kind: "action",

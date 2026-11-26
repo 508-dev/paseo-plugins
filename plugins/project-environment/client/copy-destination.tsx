@@ -1,6 +1,6 @@
 import { type ReactNode, useCallback, useMemo, useState } from "react";
 import { Text, View } from "react-native";
-import { useRpc } from "@getpaseo/plugin/client";
+import { useRpc, useTranslation } from "@getpaseo/plugin/client";
 import type { PluginTheme } from "@getpaseo/plugin";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { z } from "zod";
@@ -12,14 +12,15 @@ import {
 } from "../shared/environment";
 import { ActionButton } from "./action-button";
 import { Field } from "./field";
+import { messages } from "./messages";
 
 type Destination = z.infer<typeof variableDestinations.output>["destinations"][number];
-const failures: Record<Exclude<CopyStatus, "copied">, string> = {
-  exists: "This variable already exists in the destination.",
-  "same-scope": "Choose a different scope.",
-  missing: "The source variable is no longer available.",
-  full: "The destination has reached its variable limit.",
-};
+const failures = {
+  exists: "destinationExists",
+  "same-scope": "sameDestination",
+  missing: "sourceMissing",
+  full: "destinationFull",
+} as const satisfies Record<Exclude<CopyStatus, "copied">, string>;
 
 export function CopyDestination({
   name,
@@ -34,6 +35,7 @@ export function CopyDestination({
   theme: PluginTheme;
   children?: ReactNode;
 }) {
+  const { t } = useTranslation(messages);
   const list = useRpc(variableDestinations);
   const copy = useRpc(copyVariable);
   const queryClient = useQueryClient();
@@ -111,18 +113,18 @@ export function CopyDestination({
         return false;
       return `${label} ${directory}`.toLocaleLowerCase().includes(term);
     }) ?? [];
-  let error = transfer.isError ? "Could not copy the variable. Try again." : "";
+  let error = transfer.isError ? t("transferError") : "";
   const status = transfer.data?.status;
-  if (status && status !== "copied") error = failures[status];
+  if (status && status !== "copied") error = t(failures[status]);
 
   if (!open)
     return (
       <View style={styles.actions}>
-        <ActionButton label="Copy to…" onPress={show} theme={theme} />
+        <ActionButton label={t("copyTo")} onPress={show} theme={theme} />
         {children}
         {status === "copied" && destination ? (
           <Text accessibilityRole="alert" style={styles.success}>
-            Copied to {destination.label}.
+            {t("copiedTo", { destination: destination.label })}
           </Text>
         ) : null}
       </View>
@@ -130,21 +132,21 @@ export function CopyDestination({
 
   return (
     <View style={styles.panel}>
-      <Text style={styles.title}>Copy {name} to</Text>
+      <Text style={styles.title}>{t("copyNameTo", { name })}</Text>
       {destination ? (
         <>
           <Text style={styles.title}>{destination.label}</Text>
           <Text style={styles.detail}>{destination.directory}</Text>
           <View style={styles.actions}>
             <ActionButton
-              label={isPending ? "Copying…" : "Copy variable"}
+              label={isPending ? t("copying") : t("copyVariable")}
               onPress={confirm}
               theme={theme}
               variant="primary"
               disabled={isPending}
             />
             <ActionButton
-              label="Change destination"
+              label={t("changeDestination")}
               onPress={changeDestination}
               theme={theme}
               disabled={isPending}
@@ -153,21 +155,18 @@ export function CopyDestination({
         </>
       ) : (
         <>
-          <Field
-            label="Find a project or workspace"
-            value={query}
-            onChangeText={setQuery}
-            theme={theme}
-          />
-          {destinations.isPending ? <Text style={styles.detail}>Loading destinations…</Text> : null}
+          <Field label={t("findDestination")} value={query} onChangeText={setQuery} theme={theme} />
+          {destinations.isPending ? (
+            <Text style={styles.detail}>{t("loadingDestinations")}</Text>
+          ) : null}
           {destinations.isError ? (
             <>
-              <Text style={styles.error}>Could not load destinations.</Text>
-              <ActionButton label="Retry" onPress={retry} theme={theme} />
+              <Text style={styles.error}>{t("loadDestinationsError")}</Text>
+              <ActionButton label={t("retry")} onPress={retry} theme={theme} />
             </>
           ) : null}
           {destinations.isSuccess && !matches.length ? (
-            <Text style={styles.detail}>No matching destinations.</Text>
+            <Text style={styles.detail}>{t("noDestinations")}</Text>
           ) : null}
           {matches.slice(0, 12).map((option) => (
             <DestinationRow
@@ -181,9 +180,7 @@ export function CopyDestination({
               choose={choose}
             />
           ))}
-          {matches.length > 12 ? (
-            <Text style={styles.detail}>Search to see more destinations.</Text>
-          ) : null}
+          {matches.length > 12 ? <Text style={styles.detail}>{t("moreDestinations")}</Text> : null}
         </>
       )}
       {error ? (
@@ -191,7 +188,7 @@ export function CopyDestination({
           {error}
         </Text>
       ) : null}
-      <ActionButton label="Cancel copy" onPress={cancel} theme={theme} disabled={isPending} />
+      <ActionButton label={t("cancelCopy")} onPress={cancel} theme={theme} disabled={isPending} />
     </View>
   );
 }

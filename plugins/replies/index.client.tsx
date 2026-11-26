@@ -1,3 +1,4 @@
+import { messages } from "./client/messages";
 import type { PluginClientContext } from "@getpaseo/plugin/client";
 import { GenerationSettings } from "./client/generation-settings";
 import { observeAgents } from "./client/agents";
@@ -6,7 +7,7 @@ import { contributeReplyPills } from "./client/reply-pills";
 export default function contribute(client: PluginClientContext) {
   client.addSettingsScreen({
     id: "generation",
-    title: "Generation",
+    title: messages.message("generation"),
     icon: "Settings",
     Component: GenerationSettings,
   });

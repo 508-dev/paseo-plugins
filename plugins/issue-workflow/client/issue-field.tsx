@@ -1,9 +1,11 @@
+import { messages } from "./messages";
 import { useCallback, useMemo } from "react";
-import { useNewWorkspace, useRpc } from "@getpaseo/plugin/client";
+import { useTranslation, useNewWorkspace, useRpc } from "@getpaseo/plugin/client";
 import { Combobox } from "@getpaseo/plugin/client/ui";
 import { ISSUE_METADATA_KEY, issueSchema, searchIssuesRpc } from "../shared/issues";
 
 export function IssueField() {
+  const { t } = useTranslation(messages);
   const newWorkspace = useNewWorkspace();
   const searchIssues = useRpc(searchIssuesRpc);
   const stored = issueSchema.safeParse(newWorkspace.metadata[ISSUE_METADATA_KEY]);
@@ -21,7 +23,7 @@ export function IssueField() {
   );
   return (
     <Combobox
-      title="GitHub issue"
+      title={t("issue")}
       icon="CircleDot"
       value={value}
       search={search}

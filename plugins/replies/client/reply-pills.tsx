@@ -1,7 +1,10 @@
+import { messages } from "./messages";
 import {
+  useTranslation,
   type PluginButtonContentProps,
   type PluginButtonRegistration,
   type PluginClientContext,
+  type PluginText,
   useAgent,
   useComposers,
 } from "@getpaseo/plugin/client";
@@ -9,7 +12,7 @@ import { Icon } from "@getpaseo/plugin/client/ui";
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, type PressableStateCallbackType, Text, View } from "react-native";
 import { lastExchange, suggestRepliesRpc } from "../shared/suggestions";
-import { insertReply } from "./insert-reply";
+import { insertReply, ReplyInsertError } from "./insert-reply";
 import type { Agents } from "./agents";
 
 const BUSY = new Set(["running", "initializing"]);
@@ -23,7 +26,7 @@ interface AgentPills {
   readonly workspaceId: string;
   readonly replies: {
     readonly count: number;
-    readonly registration: PluginButtonRegistration;
+    readonly registration: PluginButtonRegistration<PluginText>;
   } | null;
 }
 
@@ -35,7 +38,7 @@ interface AgentPills {
 export function contributeReplyPills(client: PluginClientContext, agents: Agents) {
   let stopped = false;
   const replies = new Map<string, readonly string[]>();
-  const errors = new Map<string, string>();
+  const errors = new Map<string, { detail?: string }>();
   const listeners = new Set<() => void>();
   const statuses = new Map<string, string | undefined>();
   // Only the latest read per agent may land: a new turn can end before an older read returns.
@@ -50,9 +53,9 @@ export function contributeReplyPills(client: PluginClientContext, agents: Agents
 
   const insert = async (agentId: string, text: string) => {
     if (BUSY.has(agents.statuses.get(agentId) ?? ""))
-      throw new Error("The agent started another turn.");
+      throw new ReplyInsertError("newTurn", "The agent started another turn.");
     if (!replies.get(agentId)?.includes(text))
-      throw new Error("This suggestion is no longer current.");
+      throw new ReplyInsertError("staleSuggestion", "This suggestion is no longer current.");
     const [composer] = client.composers({ agentId });
     await insertReply(composer, text);
     setReplies(agentId, null);
@@ -62,6 +65,7 @@ export function contributeReplyPills(client: PluginClientContext, agents: Agents
   // The popover reads the list live, so a new list never needs a new behavior,
   // which would close an open popover.
   function RepliesMenu({ theme, layout, close, ...target }: PluginButtonContentProps) {
+    const { t } = useTranslation(messages);
     const agentId = target.context === "agent" ? target.agentId : "";
     const [list, setList] = useState(() => replies.get(agentId) ?? []);
     useEffect(() => {
@@ -73,7 +77,9 @@ export function contributeReplyPills(client: PluginClientContext, agents: Agents
       };
     }, [agentId]);
     const [composer] = useComposers({ agentId });
-    const [actionError, setActionError] = useState<string | null>(null);
+    const [actionError, setActionError] = useState<
+      { key: ReplyInsertError["key"] } | { detail?: string } | null
+    >(null);
     const [pending, setPending] = useState(false);
     const hasDraft = Boolean(composer?.prompt.trim());
     const unavailable = !composer || hasDraft || pending;
@@ -105,19 +111,23 @@ export function contributeReplyPills(client: PluginClientContext, agents: Agents
     );
     return (
       <View style={styles.list}>
-        {busy ? <Text style={styles.note}>Available when the agent finishes its turn.</Text> : null}
-        {hasDraft ? (
-          <Text style={styles.note}>Clear your draft to insert a suggestion.</Text>
-        ) : null}
+        {busy ? <Text style={styles.note}>{t("busy")}</Text> : null}
+        {hasDraft ? <Text style={styles.note}>{t("clearDraft")}</Text> : null}
         {actionError ? (
           <Text accessibilityRole="alert" style={styles.note}>
-            {actionError}
+            {"key" in actionError
+              ? t(actionError.key)
+              : actionError.detail
+                ? t("insertDetail", { detail: actionError.detail })
+                : t("insertFailed")}
           </Text>
         ) : null}
         {generationError ? (
           <View>
             <Text accessibilityRole="alert" style={styles.note}>
-              {generationError}
+              {generationError.detail
+                ? t("generationDetail", { detail: generationError.detail })
+                : t("generationFailed")}
             </Text>
             <Pressable
               accessibilityRole="button"
@@ -126,16 +136,12 @@ export function contributeReplyPills(client: PluginClientContext, agents: Agents
                 setPending(true);
                 try {
                   await suggest(agentId);
-                } catch (error) {
-                  setActionError(
-                    error instanceof Error ? error.message : "Reply generation failed.",
-                  );
                 } finally {
                   setPending(false);
                 }
               }}
             >
-              <Text style={styles.text}>Retry suggestions</Text>
+              <Text style={styles.text}>{t("retrySuggestions")}</Text>
             </Pressable>
           </View>
         ) : null}
@@ -143,7 +149,7 @@ export function contributeReplyPills(client: PluginClientContext, agents: Agents
           <Pressable
             key={reply}
             accessibilityRole="button"
-            accessibilityLabel={`Insert draft: ${reply}`}
+            accessibilityLabel={t("insertDraft", { reply })}
             disabled={busy || unavailable}
             onPress={async () => {
               setPending(true);
@@ -152,7 +158,11 @@ export function contributeReplyPills(client: PluginClientContext, agents: Agents
                 await insert(agentId, reply);
                 close();
               } catch (error) {
-                setActionError(error instanceof Error ? error.message : "Could not insert reply.");
+                setActionError(
+                  error instanceof ReplyInsertError
+                    ? { key: error.key }
+                    : { detail: error instanceof Error ? error.message : undefined },
+                );
               } finally {
                 setPending(false);
               }
@@ -185,9 +195,12 @@ export function contributeReplyPills(client: PluginClientContext, agents: Agents
       workspaceId,
       agentId,
       button: {
-        title: "Choose a reply to edit before sending",
+        title: messages.message("pickReply"),
         icon: "MessageSquareReply",
-        label: count > 0 ? `Replies · ${count}` : "Replies · Retry",
+        label:
+          count > 0
+            ? messages.message("repliesCount", { count })
+            : messages.message("repliesRetry"),
         behavior: { kind: "popover", Content: RepliesMenu },
       },
     }),
@@ -218,7 +231,12 @@ export function contributeReplyPills(client: PluginClientContext, agents: Agents
       next = null;
     } else if (!next) next = repliesPill(workspaceId, agentId, count);
     else if (next.count !== count) {
-      next.registration.update({ label: count > 0 ? `Replies · ${count}` : "Replies · Retry" });
+      next.registration.update({
+        label:
+          count > 0
+            ? messages.message("repliesCount", { count })
+            : messages.message("repliesRetry"),
+      });
       next = { ...next, count };
     }
     pills.set(agentId, { ...pill, replies: next });
@@ -246,7 +264,7 @@ export function contributeReplyPills(client: PluginClientContext, agents: Agents
       render(agentId);
     } catch (error) {
       if (stopped || reads.get(agentId) !== read) return;
-      errors.set(agentId, error instanceof Error ? error.message : "Reply generation failed.");
+      errors.set(agentId, { detail: error instanceof Error ? error.message : undefined });
       setReplies(agentId, []);
       render(agentId);
     }

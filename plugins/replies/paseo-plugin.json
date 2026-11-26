@@ -5,5 +5,11 @@
   "requirements": {
     "paseo": ">=0.16.0-beta.2"
   },
-  "description": "Suggested next replies you can edit before sending, with a configurable Claude model."
+  "description": "Suggested next replies you can edit before sending, with a configurable Claude model.",
+  "translations": {
+    "zh-CN": {
+      "name": "回复建议",
+      "description": "使用可配置的 Claude 模型生成可编辑的回复建议。"
+    }
+  }
 }
