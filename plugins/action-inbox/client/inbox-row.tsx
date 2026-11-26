@@ -66,6 +66,15 @@ export function InboxRow({
   const muted = { color: theme.colors.foregroundMuted, fontSize: 12, lineHeight: 18 };
   const updatedAt = new Date(card.updatedAt);
   const minutes = Math.max(0, Math.floor((Date.now() - updatedAt.getTime()) / 60_000));
+  const metadata = [
+    {
+      labelKey: "metadataAgent",
+      icon: "Bot",
+      value: card.workspaceName && card.workspaceName !== card.agentTitle ? card.agentTitle : null,
+    },
+    { labelKey: "metadataProject", icon: "FolderGit2", value: card.projectName },
+    { labelKey: "metadataHost", icon: "Server", value: card.hostLabel },
+  ] as const;
 
   function age() {
     if (!Number.isFinite(minutes)) return "";
@@ -99,14 +108,25 @@ export function InboxRow({
       <Text style={[foreground, { fontWeight: unread ? "600" : "400" }]}>
         {card.workspaceName ?? card.agentTitle}
       </Text>
-      {card.workspaceName && card.workspaceName !== card.agentTitle ? (
-        <Text numberOfLines={1} style={muted}>
-          {card.agentTitle}
-        </Text>
-      ) : null}
-      <Text numberOfLines={2} style={muted}>
-        {card.projectName} · {card.hostLabel}
-      </Text>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", columnGap: 12, rowGap: 2 }}>
+        {metadata.map(({ labelKey, icon, value }) =>
+          value ? (
+            <View
+              key={labelKey}
+              style={{ flexDirection: "row", alignItems: "center", gap: 4, maxWidth: "100%" }}
+            >
+              <Icon name={icon} size={12} color={theme.colors.foregroundMuted} />
+              <Text
+                accessibilityLabel={t(labelKey, { name: value })}
+                numberOfLines={1}
+                style={[muted, { flexShrink: 1 }]}
+              >
+                {value}
+              </Text>
+            </View>
+          ) : null,
+        )}
+      </View>
       {card.kind === "question" && card.permission ? (
         <View style={{ gap: 6, paddingTop: 2 }}>
           <Text numberOfLines={3} style={foreground}>
