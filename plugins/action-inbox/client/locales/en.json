@@ -27,6 +27,7 @@
   "all": "All",
   "unread": "Unread",
   "unreadTab": "Unread {{count, number}}",
+  "showSubagents": "Show subagents",
   "failures": "Show failures",
   "failuresCount": "Show failures ({{count, number}})",
   "unreadFailures": "Show failures, unread failures: {{count, number}}",

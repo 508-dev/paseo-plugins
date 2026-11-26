@@ -25,6 +25,7 @@
   "all": "전체",
   "unread": "읽지 않음",
   "unreadTab": "읽지 않음 {{count, number}}",
+  "showSubagents": "하위 에이전트 표시",
   "failures": "실패 항목 표시",
   "failuresCount": "실패 항목 표시 ({{count, number}})",
   "unreadFailures": "실패 항목 표시, 읽지 않은 실패 {{count, number}}개",

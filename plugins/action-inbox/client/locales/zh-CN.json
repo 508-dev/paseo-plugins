@@ -25,6 +25,7 @@
   "all": "全部",
   "unread": "未读",
   "unreadTab": "未读 {{count, number}}",
+  "showSubagents": "显示子代理",
   "failures": "显示失败项",
   "failuresCount": "显示失败项（{{count, number}}）",
   "unreadFailures": "显示失败项，未读失败：{{count, number}}",

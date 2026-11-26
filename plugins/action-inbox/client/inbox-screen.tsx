@@ -1,5 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { FlatList, Switch, Text, View } from "react-native";
+import { FlatList, Text, View } from "react-native";
 import {
   getPaseoClient,
   useSettings,
@@ -9,7 +9,7 @@ import {
 import { inboxPreferences } from "../shared/preferences";
 import { filterCards, isUnread, markRead, respondToCard, type InboxCard } from "./inbox-model";
 import { createApprovalStore } from "./inbox-approvals";
-import { InboxButton, InboxFilter } from "./inbox-controls";
+import { InboxButton, InboxFilter, InboxSwitch } from "./inbox-controls";
 import { InboxRow } from "./inbox-row";
 import { useInbox } from "./use-inbox";
 import { messages } from "./messages";
@@ -33,19 +33,21 @@ export function InboxScreen({ theme, layout, navigation }: PluginScreenProps) {
   const readReady = preferences.status === "ready";
   const read = readReady ? preferences.values.readTokens : {};
   const showFailures = readReady && preferences.values.showFailures;
-  const attentionCount = filterCards(inbox.cards, { showFailures }, read).length;
-  const unreadCount = filterCards(inbox.cards, { showFailures, unreadOnly: true }, read).length;
-  const filters = { hostId, projectKey, showFailures };
+  const showSubagents = readReady && preferences.values.showSubagents;
+  const visibility = { showFailures, showSubagents };
+  const attentionCount = filterCards(inbox.cards, visibility, read).length;
+  const unreadCount = filterCards(inbox.cards, { ...visibility, unreadOnly: true }, read).length;
+  const filters = { hostId, projectKey, ...visibility };
   const visible = filterCards(inbox.cards, { ...filters, unreadOnly }, read);
   const scopedUnreadCount = filterCards(inbox.cards, { ...filters, unreadOnly: true }, read).length;
   const unreadFailures = readReady
     ? filterCards(
         inbox.cards.filter((card) => card.kind === "failed"),
-        { hostId, projectKey, unreadOnly: true, showFailures: true },
+        { ...filters, unreadOnly: true, showFailures: true },
         read,
       ).length
     : 0;
-  const failuresToggleDisabled = !readReady || preferences.saving;
+  const visibilityDisabled = !readReady || preferences.saving;
   const onlineCount = inbox.hosts.filter((host) => host.status === "online").length;
   const projects = [
     ...new Map(
@@ -69,9 +71,9 @@ export function InboxScreen({ theme, layout, navigation }: PluginScreenProps) {
     await preferences.save({ ...preferences.values, readTokens: next }, preferences.revision);
   }
 
-  async function setShowFailures(value: boolean) {
+  async function setVisibility(key: "showFailures" | "showSubagents", value: boolean) {
     if (preferences.status !== "ready" || preferences.saving) return;
-    await preferences.save({ ...preferences.values, showFailures: value }, preferences.revision);
+    await preferences.save({ ...preferences.values, [key]: value }, preferences.revision);
   }
 
   const muted = { color: theme.colors.foregroundMuted, fontSize: 12 };
@@ -184,38 +186,29 @@ export function InboxScreen({ theme, layout, navigation }: PluginScreenProps) {
                 theme={theme}
                 compact={layout.compact}
               />
-              <View
-                style={{
-                  minHeight: layout.compact ? 44 : 32,
-                  paddingHorizontal: 8,
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 8,
-                  opacity: failuresToggleDisabled ? 0.5 : 1,
-                }}
-              >
-                <Switch
-                  accessibilityLabel={
-                    unreadFailures > 0
-                      ? t("unreadFailures", { count: unreadFailures })
-                      : t("failures")
-                  }
-                  disabled={failuresToggleDisabled}
-                  value={showFailures}
-                  onValueChange={(value) => void setShowFailures(value)}
-                  trackColor={{ false: theme.colors.surface2, true: theme.colors.accent }}
-                  thumbColor={
-                    showFailures ? theme.colors.accentForeground : theme.colors.foregroundMuted
-                  }
-                  ios_backgroundColor={theme.colors.surface2}
-                  hitSlop={8}
-                />
-                <Text style={{ color: theme.colors.foreground, fontSize: 13 }}>
-                  {unreadFailures > 0
-                    ? t("failuresCount", { count: unreadFailures })
-                    : t("failures")}
-                </Text>
-              </View>
+              <InboxSwitch
+                label={
+                  unreadFailures > 0 ? t("failuresCount", { count: unreadFailures }) : t("failures")
+                }
+                accessibilityLabel={
+                  unreadFailures > 0
+                    ? t("unreadFailures", { count: unreadFailures })
+                    : t("failures")
+                }
+                disabled={visibilityDisabled}
+                value={showFailures}
+                onValueChange={(value) => void setVisibility("showFailures", value)}
+                theme={theme}
+                compact={layout.compact}
+              />
+              <InboxSwitch
+                label={t("showSubagents")}
+                disabled={visibilityDisabled}
+                value={showSubagents}
+                onValueChange={(value) => void setVisibility("showSubagents", value)}
+                theme={theme}
+                compact={layout.compact}
+              />
             </View>
             <View
               style={{

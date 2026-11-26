@@ -2,6 +2,8 @@
 
 See pending agent questions, tool approvals, and finished work needing review across your online Paseo hosts. Filter the list by host, project, or unread status. Use **Show failures** to include failed runs. The switch starts off and shows the number of unread failures for the selected host and project in either position. Hidden failures stay unread and are excluded from the sidebar count and bulk **Mark all read**.
 
+Subagents are hidden by default. Turn on **Show subagents** to include them.
+
 Requires Paseo 0.16.0-beta.1 or newer on the daemon and app, plus Node and npm on the daemon for Git installation. Preparation installs locked SDK and validation dependencies with lifecycle scripts disabled. Install the plugin on one connected host; it reads the app's existing connections to other hosts. The sidebar and screen share a refresh every 20 seconds while either is mounted, reading up to 1,000 active agents per host.
 
 Read status stays on this device, survives app reloads, and retains the most recent 5,000 read markers. Open an agent or use the read controls to mark items. Revised requests and new completions become unread again. Reading does not clear attention or answer a request.

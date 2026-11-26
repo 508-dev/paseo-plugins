@@ -1,4 +1,5 @@
 import type { PaseoAgent, PaseoAgentHandle } from "@getpaseo/client";
+import { PARENT_AGENT_ID_LABEL } from "@getpaseo/protocol/agent-labels";
 import { describe, expect, it, vi } from "vitest";
 import { inboxPreferences } from "../shared/preferences";
 import {
@@ -401,11 +402,41 @@ describe("inbox read state and filters", () => {
     expect(inboxPreferences.schema.parse({ readTokens })).toEqual({
       readTokens,
       showFailures: false,
+      showSubagents: false,
     });
     expect(inboxPreferences.schema.parse({ readTokens, showFailures: true })).toEqual({
       readTokens,
       showFailures: true,
+      showSubagents: false,
     });
+    expect(inboxPreferences.schema.parse({ readTokens, showSubagents: true }).showSubagents).toBe(
+      true,
+    );
+  });
+
+  it("hides delegated agents by default and keeps their unread state until shown", () => {
+    const labels = { [PARENT_AGENT_ID_LABEL]: "agent-a" };
+    const [parent] = cardsForAgent(
+      agent({ pendingPermissions: [permission({ kind: "question" })] }),
+      location,
+    );
+    const [child] = cardsForAgent(
+      agent({ id: "child", labels, pendingPermissions: [permission()] }),
+      location,
+    );
+    const [failedChild] = cardsForAgent(
+      agent({ id: "failed-child", labels, status: "error" }),
+      location,
+    );
+    const cards = [parent, child, failedChild];
+    const visible = filterCards(cards, {}, {});
+    expect(visible).toEqual([parent]);
+    const read = markRead({}, visible);
+    expect(filterCards(cards, { showFailures: true, unreadOnly: true }, read)).toEqual([]);
+    expect(filterCards(cards, { showSubagents: true, unreadOnly: true }, read)).toEqual([child]);
+    expect(
+      filterCards(cards, { showSubagents: true, showFailures: true, unreadOnly: true }, read),
+    ).toEqual([child, failedChild]);
   });
 
   it("keeps an approval read across refreshes and saved-state reloads, but marks changed content unread", () => {

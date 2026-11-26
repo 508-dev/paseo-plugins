@@ -8,5 +8,6 @@ export const inboxPreferences = defineSettings({
   schema: z.object({
     readTokens: z.record(z.string(), z.string()).default({}),
     showFailures: z.boolean().default(false),
+    showSubagents: z.boolean().default(false),
   }),
 });

@@ -1,4 +1,5 @@
 import type { PaseoAgent, PaseoAgentHandle } from "@getpaseo/client";
+import { isDelegatedAgent } from "@getpaseo/protocol/agent-labels";
 
 export type InboxKind = "question" | "approval" | "attention" | "failed" | "review";
 export type Permission = PaseoAgent["pendingPermissions"][number];
@@ -13,6 +14,7 @@ export interface InboxCard {
   projectName: string;
   projectKey: string;
   agentTitle: string;
+  isSubagent: boolean;
   kind: InboxKind;
   updatedAt: string;
   agentUpdatedAt: string;
@@ -48,6 +50,7 @@ export function cardsForAgent(
     projectName: location.projectName,
     projectKey: JSON.stringify([location.hostId, location.projectKey]),
     agentTitle: agent.title || agent.provider,
+    isSubagent: isDelegatedAgent(agent),
     updatedAt: agent.attentionTimestamp ?? agent.updatedAt,
     agentUpdatedAt: agent.updatedAt,
     activeTurnId: agent.activeTurn?.turnId,
@@ -115,6 +118,7 @@ export interface InboxFilters {
   projectKey?: string | null;
   unreadOnly?: boolean;
   showFailures?: boolean;
+  showSubagents?: boolean;
 }
 
 export function filterCards(
@@ -125,6 +129,7 @@ export function filterCards(
   return cards.filter(
     (card) =>
       (filters.showFailures || card.kind !== "failed") &&
+      (filters.showSubagents || !card.isSubagent) &&
       (!filters.hostId || card.hostId === filters.hostId) &&
       (!filters.projectKey || card.projectKey === filters.projectKey) &&
       (!filters.unreadOnly || isUnread(card, read)),
