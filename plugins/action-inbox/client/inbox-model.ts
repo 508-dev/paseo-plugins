@@ -1,4 +1,5 @@
 import type { PaseoAgent, PaseoAgentHandle } from "@getpaseo/client";
+import { isDelegatedAgent } from "@getpaseo/protocol/agent-labels";
 
 export type InboxKind = "question" | "approval" | "attention" | "failed" | "review";
 export type Permission = PaseoAgent["pendingPermissions"][number];
@@ -9,11 +10,15 @@ export interface InboxCard {
   hostLabel: string;
   agentId: string;
   workspaceId: string | null;
+  workspaceName: string | null;
   projectName: string;
   projectKey: string;
   agentTitle: string;
+  isSubagent: boolean;
   kind: InboxKind;
   updatedAt: string;
+  agentUpdatedAt: string;
+  activeTurnId: string | undefined;
   error: string | null;
   permission: Permission | null;
 }
@@ -27,7 +32,13 @@ export interface PermissionAction {
 
 export function cardsForAgent(
   agent: PaseoAgent,
-  location: { hostId: string; hostLabel: string; projectName: string; projectKey: string },
+  location: {
+    hostId: string;
+    hostLabel: string;
+    projectName: string;
+    projectKey: string;
+    workspaceName?: string | null;
+  },
 ): InboxCard[] {
   if (agent.archivedAt || agent.background) return [];
   const base = {
@@ -35,10 +46,14 @@ export function cardsForAgent(
     hostLabel: location.hostLabel,
     agentId: agent.id,
     workspaceId: agent.workspaceId ?? null,
+    workspaceName: location.workspaceName?.trim() || null,
     projectName: location.projectName,
     projectKey: JSON.stringify([location.hostId, location.projectKey]),
     agentTitle: agent.title || agent.provider,
+    isSubagent: isDelegatedAgent(agent),
     updatedAt: agent.attentionTimestamp ?? agent.updatedAt,
+    agentUpdatedAt: agent.updatedAt,
+    activeTurnId: agent.activeTurn?.turnId,
     error: agent.lastError ?? null,
   };
   if (agent.pendingPermissions.length > 0) {
@@ -103,6 +118,7 @@ export interface InboxFilters {
   projectKey?: string | null;
   unreadOnly?: boolean;
   showFailures?: boolean;
+  showSubagents?: boolean;
 }
 
 export function filterCards(
@@ -113,6 +129,7 @@ export function filterCards(
   return cards.filter(
     (card) =>
       (filters.showFailures || card.kind !== "failed") &&
+      (filters.showSubagents || !card.isSubagent) &&
       (!filters.hostId || card.hostId === filters.hostId) &&
       (!filters.projectKey || card.projectKey === filters.projectKey) &&
       (!filters.unreadOnly || isUnread(card, read)),

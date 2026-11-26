@@ -15,6 +15,14 @@ Paseo plugins maintained by [508.dev](https://508.dev). Each plugin is installed
 
 [Latest turn changes](plugins/latest-turn-changes) is an installable preview for Paseo 0.17.0-beta.1 and later.
 
+## Action inbox screenshots
+
+Each row leads with the workspace name, with the agent name and latest progress below it. These desktop and compact previews use example data.
+
+<img src="plugins/action-inbox/docs/screenshots/workspace-first-desktop.png" alt="Desktop Action Inbox showing workspace names, agent names, and short progress excerpts" width="850">
+
+<img src="plugins/action-inbox/docs/screenshots/workspace-first-compact.png" alt="Compact Action Inbox with Show failures on and the unread failure count visible" width="390">
+
 ## Install
 
 Enable plugins in Paseo Settings on the target host, then choose a plugin:

@@ -1,9 +1,52 @@
 import { useTranslation } from "@getpaseo/plugin/client";
 import { messages } from "./messages";
 import { useState, type ReactNode } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, Switch, Text, View } from "react-native";
 import { Icon, Modal, TextInput } from "@getpaseo/plugin/client/ui";
 import type { PluginTheme } from "@getpaseo/plugin";
+
+export function InboxSwitch({
+  label,
+  accessibilityLabel = label,
+  value,
+  onValueChange,
+  disabled,
+  theme,
+  compact,
+}: {
+  label: string;
+  accessibilityLabel?: string;
+  value: boolean;
+  onValueChange(value: boolean): void;
+  disabled: boolean;
+  theme: PluginTheme;
+  compact: boolean;
+}) {
+  return (
+    <View
+      style={{
+        minHeight: compact ? 44 : 32,
+        paddingHorizontal: 8,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        opacity: disabled ? 0.5 : 1,
+      }}
+    >
+      <Switch
+        accessibilityLabel={accessibilityLabel}
+        disabled={disabled}
+        value={value}
+        onValueChange={onValueChange}
+        trackColor={{ false: theme.colors.surface2, true: theme.colors.accent }}
+        thumbColor={value ? theme.colors.accentForeground : theme.colors.foregroundMuted}
+        ios_backgroundColor={theme.colors.surface2}
+        hitSlop={8}
+      />
+      <Text style={{ color: theme.colors.foreground, fontSize: 13 }}>{label}</Text>
+    </View>
+  );
+}
 
 export function InboxButton({
   children,

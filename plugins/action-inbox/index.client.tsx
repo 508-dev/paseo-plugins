@@ -16,7 +16,11 @@ export function InboxItem({ currentScreen, openScreen, theme }: PluginSidebarIte
     preferences.status === "ready"
       ? filterCards(
           inbox.cards,
-          { showFailures: preferences.values.showFailures, unreadOnly: true },
+          {
+            showFailures: preferences.values.showFailures,
+            showSubagents: preferences.values.showSubagents,
+            unreadOnly: true,
+          },
           preferences.values.readTokens,
         ).length
       : 0;

@@ -4,19 +4,18 @@ import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { Icon } from "@getpaseo/plugin/client/ui";
 import type { PluginTheme } from "@getpaseo/plugin";
-import type { PaseoAgentHandle } from "@getpaseo/client";
 import {
   directActions,
-  InboxResponseError,
   permissionDetails,
   permissionSummary,
   questionPreview,
-  respondToCard,
   type InboxCard,
   type InboxKind,
   type PermissionAction,
 } from "./inbox-model";
 import { InboxButton } from "./inbox-controls";
+import type { ApprovalState } from "./inbox-approvals";
+import { useInboxProgress } from "./use-inbox";
 
 const kinds: Record<
   InboxKind,
@@ -38,8 +37,8 @@ export function InboxRow({
   readDisabled,
   onToggleRead,
   onOpen,
-  getAgent,
-  onRefresh,
+  approval,
+  onRespond,
 }: {
   card: InboxCard;
   theme: PluginTheme;
@@ -49,15 +48,14 @@ export function InboxRow({
   readDisabled: boolean;
   onToggleRead(): void;
   onOpen?: () => void;
-  getAgent(): Pick<PaseoAgentHandle, "refresh" | "respondToPermission">;
-  onRefresh(): Promise<void>;
+  approval?: ApprovalState;
+  onRespond(action: PermissionAction): void;
 }) {
   const { t, locale } = useTranslation(messages);
   const [expanded, setExpanded] = useState(false);
-  const [pending, setPending] = useState<string | null>(null);
-  const [error, setError] = useState<
-    { key: InboxResponseError["key"] } | { detail: string } | null
-  >(null);
+  const pending = approval?.pending ?? null;
+  const error = approval?.error;
+  const progress = useInboxProgress(card);
   const kind = kinds[card.kind];
   const questions =
     card.permission && card.kind === "question" ? questionPreview(card.permission) : [];
@@ -68,6 +66,15 @@ export function InboxRow({
   const muted = { color: theme.colors.foregroundMuted, fontSize: 12, lineHeight: 18 };
   const updatedAt = new Date(card.updatedAt);
   const minutes = Math.max(0, Math.floor((Date.now() - updatedAt.getTime()) / 60_000));
+  const metadata = [
+    {
+      labelKey: "metadataAgent",
+      icon: "Bot",
+      value: card.workspaceName && card.workspaceName !== card.agentTitle ? card.agentTitle : null,
+    },
+    { labelKey: "metadataProject", icon: "FolderGit2", value: card.projectName },
+    { labelKey: "metadataHost", icon: "Server", value: card.hostLabel },
+  ] as const;
 
   function age() {
     if (!Number.isFinite(minutes)) return "";
@@ -75,25 +82,6 @@ export function InboxRow({
     if (minutes < 60) return t("minutesAgo", { count: minutes });
     if (minutes < 1440) return t("hoursAgo", { count: Math.floor(minutes / 60) });
     return t("daysAgo", { count: Math.floor(minutes / 1440) });
-  }
-
-  async function respond(action: PermissionAction) {
-    if (pending) return;
-    setPending(action.id);
-    setError(null);
-    try {
-      await respondToCard(card, action, getAgent);
-      await onRefresh();
-    } catch (failure) {
-      setError(
-        failure instanceof InboxResponseError
-          ? { key: failure.key }
-          : { detail: failure instanceof Error ? failure.message : String(failure) },
-      );
-      void onRefresh();
-    } finally {
-      setPending(null);
-    }
   }
 
   const content = (
@@ -117,10 +105,28 @@ export function InboxRow({
           {age()}
         </Text>
       </View>
-      <Text style={[foreground, { fontWeight: unread ? "600" : "400" }]}>{card.agentTitle}</Text>
-      <Text numberOfLines={2} style={muted}>
-        {card.projectName} · {card.hostLabel}
+      <Text style={[foreground, { fontWeight: unread ? "600" : "400" }]}>
+        {card.workspaceName ?? card.agentTitle}
       </Text>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", columnGap: 12, rowGap: 2 }}>
+        {metadata.map(({ labelKey, icon, value }) =>
+          value ? (
+            <View
+              key={labelKey}
+              style={{ flexDirection: "row", alignItems: "center", gap: 4, maxWidth: "100%" }}
+            >
+              <Icon name={icon} size={12} color={theme.colors.foregroundMuted} />
+              <Text
+                accessibilityLabel={t(labelKey, { name: value })}
+                numberOfLines={1}
+                style={[muted, { flexShrink: 1 }]}
+              >
+                {value}
+              </Text>
+            </View>
+          ) : null,
+        )}
+      </View>
       {card.kind === "question" && card.permission ? (
         <View style={{ gap: 6, paddingTop: 2 }}>
           <Text numberOfLines={3} style={foreground}>
@@ -164,6 +170,25 @@ export function InboxRow({
         </Text>
       ) : null}
       {card.kind === "attention" ? <Text style={foreground}>{t("agentWaiting")}</Text> : null}
+      {progress ? (
+        <View
+          style={{
+            marginTop: 2,
+            paddingLeft: 8,
+            borderLeftWidth: 2,
+            borderLeftColor: theme.colors.foregroundMuted,
+          }}
+        >
+          <Text
+            numberOfLines={2}
+            style={{ color: theme.colors.foreground, fontSize: 13, lineHeight: 19 }}
+          >
+            <Text style={{ fontWeight: "600" }}>{t("latestUpdate")}</Text>
+            {"  "}
+            {progress}
+          </Text>
+        </View>
+      ) : null}
     </>
   );
   const readAction = (
@@ -275,7 +300,7 @@ export function InboxRow({
                     variant={action.behavior === "allow" ? "solid" : "outline"}
                     danger={action.behavior === "deny"}
                     icon={action.behavior === "allow" ? "Check" : "X"}
-                    onPress={() => void respond(action)}
+                    onPress={() => onRespond(action)}
                   >
                     {pending === action.id ? t("sending") : (action.label ?? t(action.behavior))}
                   </InboxButton>
