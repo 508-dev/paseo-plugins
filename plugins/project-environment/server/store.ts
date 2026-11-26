@@ -209,13 +209,24 @@ export class EnvironmentStore {
     return this.change(scope, (variables) => variables.filter((entry) => entry.name !== name));
   }
 
-  async copy(source: StorageKey, destination: StorageScope, name: string): Promise<CopyStatus> {
+  async copy(
+    source: StorageKey,
+    destination: StorageScope,
+    name: string,
+    overwrite = false,
+  ): Promise<CopyStatus> {
     if (this.file(source) === this.file(destination)) return "same-scope";
     return this.enqueue(async () => {
       const variable = (await this.read(source)).find((entry) => entry.name === name);
       if (!variable) return "missing";
       const variables = await this.read(destination);
-      if (variables.some((entry) => entry.name === name)) return "exists";
+      const existing = variables.findIndex((entry) => entry.name === name);
+      if (existing !== -1) {
+        if (!overwrite) return "exists";
+        variables[existing] = variable;
+        await this.write(destination, variables);
+        return "overwritten";
+      }
       if (variables.length >= 256) return "full";
       await this.write(
         destination,

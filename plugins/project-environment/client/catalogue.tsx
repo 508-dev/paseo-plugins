@@ -17,6 +17,8 @@ import { Field } from "./field";
 type OpenEditor = (workspaceId: string) => void;
 interface CatalogueScreenProps extends PluginScreenProps {
   openEditor: OpenEditor;
+  initialSearch: string;
+  onSearchChange(query: string): void;
 }
 interface ProjectResultsProps {
   project: CatalogueProject;
@@ -150,14 +152,28 @@ function VariableResult({
     </View>
   );
 }
-export function VariableCatalogueScreen({ theme, layout, host, openEditor }: CatalogueScreenProps) {
+export function VariableCatalogueScreen({
+  theme,
+  layout,
+  host,
+  openEditor,
+  initialSearch,
+  onSearchChange,
+}: CatalogueScreenProps) {
   const { t } = useTranslation(messages);
   const read = useRpc(variableCatalogue);
   const catalogue = useQuery({
     queryKey: ["project-environment-catalogue", host.id],
     queryFn: () => read({}),
   });
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialSearch);
+  const changeQuery = useCallback(
+    (value: string) => {
+      setQuery(value);
+      onSearchChange(value);
+    },
+    [onSearchChange],
+  );
   const styles = useMemo(
     () => ({
       screen: { flex: 1, backgroundColor: theme.colors.surface0 },
@@ -208,7 +224,7 @@ export function VariableCatalogueScreen({ theme, layout, host, openEditor }: Cat
         label={t("searchVariables")}
         value={query}
         placeholder={t("nameOrDescription")}
-        onChangeText={setQuery}
+        onChangeText={changeQuery}
         theme={theme}
       />
       <View style={styles.toolbar}>
