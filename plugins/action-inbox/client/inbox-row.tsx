@@ -96,7 +96,14 @@ export function InboxRow({
           {age()}
         </Text>
       </View>
-      <Text style={[foreground, { fontWeight: unread ? "600" : "400" }]}>{card.agentTitle}</Text>
+      <Text style={[foreground, { fontWeight: unread ? "600" : "400" }]}>
+        {card.workspaceName ?? card.agentTitle}
+      </Text>
+      {card.workspaceName && card.workspaceName !== card.agentTitle ? (
+        <Text numberOfLines={1} style={muted}>
+          {card.agentTitle}
+        </Text>
+      ) : null}
       <Text numberOfLines={2} style={muted}>
         {card.projectName} · {card.hostLabel}
       </Text>

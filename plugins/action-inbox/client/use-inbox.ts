@@ -21,6 +21,7 @@ async function loadHost(host: PluginHostSummary) {
           hostLabel: host.label,
           projectName: entry.project.projectName,
           projectKey: entry.project.projectKey,
+          workspaceName: entry.project.workspaceName,
         }),
       );
     cursor = result.pageInfo.nextCursor ?? undefined;

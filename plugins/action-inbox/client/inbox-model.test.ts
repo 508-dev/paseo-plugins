@@ -25,6 +25,14 @@ const location = {
   projectKey: "paseo",
 };
 
+it("keeps the workspace display name and agent title independently", () => {
+  const failed = agent({ status: "error", title: "Review the migration" });
+  const [card] = cardsForAgent(failed, { ...location, workspaceName: "  Release prep  " });
+  expect(card).toMatchObject({ workspaceName: "Release prep", agentTitle: "Review the migration" });
+  expect(cardsForAgent(failed, location)[0].workspaceName).toBeNull();
+  expect(cardsForAgent(failed, { ...location, workspaceName: " " })[0].workspaceName).toBeNull();
+});
+
 describe("latest progress previews", () => {
   const assistant = (text: string, turnId?: string) => ({
     turnId,

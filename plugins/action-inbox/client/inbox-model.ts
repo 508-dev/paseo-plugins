@@ -9,6 +9,7 @@ export interface InboxCard {
   hostLabel: string;
   agentId: string;
   workspaceId: string | null;
+  workspaceName: string | null;
   projectName: string;
   projectKey: string;
   agentTitle: string;
@@ -29,7 +30,13 @@ export interface PermissionAction {
 
 export function cardsForAgent(
   agent: PaseoAgent,
-  location: { hostId: string; hostLabel: string; projectName: string; projectKey: string },
+  location: {
+    hostId: string;
+    hostLabel: string;
+    projectName: string;
+    projectKey: string;
+    workspaceName?: string | null;
+  },
 ): InboxCard[] {
   if (agent.archivedAt || agent.background) return [];
   const base = {
@@ -37,6 +44,7 @@ export function cardsForAgent(
     hostLabel: location.hostLabel,
     agentId: agent.id,
     workspaceId: agent.workspaceId ?? null,
+    workspaceName: location.workspaceName?.trim() || null,
     projectName: location.projectName,
     projectKey: JSON.stringify([location.hostId, location.projectKey]),
     agentTitle: agent.title || agent.provider,
