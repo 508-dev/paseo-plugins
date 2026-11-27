@@ -14,6 +14,8 @@ An opt-in [Paseo](https://paseo.sh) plugin that watches a GitHub PR and sends it
 
 The `/watch-pr https://github.com/owner/repo/pull/123` and `/watch-pr owner/repo#123` shortcuts remain available in agent chat.
 
+When Action Inbox is installed on the same host, its **Pull requests** tab uses this plugin to discover PRs, check status, and manage watches. **Fix this PR** sends one request to the selected workspace agent. PR Watcher rechecks the current PR status and workspace branch before sending.
+
 The plugin does not merge PRs. It sends the agent a request to inspect and address actionable events. It treats the state at enrollment as a baseline, so existing failures do not trigger an immediate follow-up. It polls every two minutes, waits ten minutes between follow-ups, and pauses after five sends per watch. Remove and re-add a watch to begin a new cycle.
 
 ## UI previews

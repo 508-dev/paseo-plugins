@@ -3,7 +3,7 @@ import type { PluginClientContext, PluginSidebarItemProps } from "@getpaseo/plug
 import { SidebarRow } from "@getpaseo/plugin/client/ui";
 import { useTranslation, useSettings } from "@getpaseo/plugin/client";
 import { Text } from "react-native";
-import { InboxScreen } from "./client/inbox-screen";
+import { ActionInboxScreen } from "./client/action-inbox-screen";
 import { useInbox } from "./client/use-inbox";
 import { filterCards } from "./client/inbox-model";
 import { inboxPreferences } from "./shared/preferences";
@@ -45,7 +45,7 @@ export function InboxItem({ currentScreen, openScreen, theme }: PluginSidebarIte
 }
 
 export default function contribute(client: PluginClientContext) {
-  client.addScreen({ id: "inbox", title: messages.message("inbox"), Component: InboxScreen });
+  client.addScreen({ id: "inbox", title: messages.message("inbox"), Component: ActionInboxScreen });
   client.addSidebarHeaderItem({
     id: "inbox",
     title: messages.message("inbox"),

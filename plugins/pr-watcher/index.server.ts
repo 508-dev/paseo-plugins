@@ -1,3 +1,4 @@
+import type { PaseoApi } from "@getpaseo/client";
 import type { PluginServerContext } from "@getpaseo/plugin/server";
 import { WatchStore } from "./server/state.js";
 import { Watcher } from "./server/watcher.js";
@@ -10,6 +11,7 @@ import {
   resolveUncertain,
 } from "./shared/contracts.js";
 import { discoverPullRequests, readBranch } from "./server/discovery.js";
+import { startInboxBridge } from "./server/inbox.js";
 import {
   workspaceDirectory,
   validateWorkspaceWatch,
@@ -19,6 +21,8 @@ import {
 export default function contribute(server: PluginServerContext) {
   const watcher = new Watcher(new WatchStore());
   const ready = watcher.start();
+  let inboxPaseo: PaseoApi | null = null;
+  const stopInboxBridge = startInboxBridge(() => inboxPaseo, watcher, ready);
   // Observe startup immediately; RPC handlers still await the original rejection.
   void ready.catch(() =>
     console.error("PR watcher could not load its state file. Restore it and reload the plugin."),
@@ -55,6 +59,7 @@ export default function contribute(server: PluginServerContext) {
   });
   server.handle(listWatches, async (_input, { paseo }) => {
     await ready;
+    inboxPaseo = paseo;
     watcher.attachPaseo(paseo);
     return { watches: watcher.list() };
   });
@@ -71,5 +76,8 @@ export default function contribute(server: PluginServerContext) {
     return {};
   });
 
-  return () => watcher.stop();
+  return async () => {
+    watcher.stop();
+    await stopInboxBridge();
+  };
 }

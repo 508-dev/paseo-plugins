@@ -21,6 +21,8 @@ Enable plugins in Paseo's plugin settings if that daemon has them disabled. Plug
 
 ## Behavior and limits
 
+- The **Pull requests** tab lists open GitHub PRs for active workspaces and existing watches on the selected host. Install or update PR Watcher on that host with authenticated `gh` access. Use **Load more workspaces** to continue scanning.
+- **Fix this PR** sends a one-time request to the workspace agent you select. **Watch PR** uses PR Watcher to follow later activity. It does not send a follow-up for issues already present when you start the watch.
 - Tap a row to open its agent tab on mobile or in a compact window. The envelope button changes read status.
 - The sidebar and inbox share one refresh every 20 seconds while either is mounted. A manual Refresh action is also available. The plugin reads active, non-background agents from online hosts. Offline hosts are named in the screen; their last known state is not shown as current.
 - The inbox reads up to 1,000 active agents per host. A host with more is marked as truncated.
