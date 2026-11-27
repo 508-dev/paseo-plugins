@@ -1,7 +1,7 @@
 import { type ReactNode, useCallback, useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useRpc, useTranslation } from "@getpaseo/plugin/client";
-import { Icon } from "@getpaseo/plugin/client/ui";
+import { Icon, Modal, useToast } from "@getpaseo/plugin/client/ui";
 import type { PluginTheme } from "@getpaseo/plugin";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { z } from "zod";
@@ -29,14 +29,17 @@ export function CopyDestination({
   hostId,
   theme,
   children,
+  compact = false,
 }: {
   name: string;
   source: VariableTarget;
   hostId: string;
   theme: PluginTheme;
   children?: ReactNode;
+  compact?: boolean;
 }) {
   const { t } = useTranslation(messages);
+  const toast = useToast();
   const list = useRpc(variableDestinations);
   const copy = useRpc(copyVariable);
   const queryClient = useQueryClient();
@@ -59,6 +62,13 @@ export function CopyDestination({
       if (result.status === "exists") setRequiresOverwrite(true);
       if (result.status !== "copied" && result.status !== "overwritten") return;
       setOpen(false);
+      if (compact && destination)
+        toast.show(
+          t(result.status === "overwritten" ? "overwrittenTo" : "copiedTo", {
+            destination: destination.label,
+          }),
+          { variant: "success" },
+        );
       void queryClient.invalidateQueries({ queryKey: ["project-environment", hostId] });
       void queryClient.invalidateQueries({ queryKey: ["project-environment-catalogue", hostId] });
     },
@@ -77,6 +87,12 @@ export function CopyDestination({
     reset();
     setOpen(false);
   }, [reset]);
+  const dismiss = useCallback(
+    (next: boolean) => {
+      if (!next && !isPending) cancel();
+    },
+    [cancel, isPending],
+  );
   const confirm = useCallback(() => {
     if (destination && !isPending)
       mutate({ target: destination.target, overwrite: requiresOverwrite });
@@ -160,7 +176,7 @@ export function CopyDestination({
   if (status && !completed && status !== "exists") error = t(failures[status]);
   const actionLabel = requiresOverwrite ? t("overwriteVariable") : t("copyVariable");
 
-  if (!open)
+  if (!open && !compact)
     return (
       <View style={styles.actions}>
         <ActionButton label={t("copyTo")} onPress={show} theme={theme} />
@@ -175,18 +191,20 @@ export function CopyDestination({
       </View>
     );
 
-  return (
+  const picker = (
     <View style={styles.panel}>
-      <View style={styles.heading}>
-        <Text style={styles.headingText}>{t("copyNameTo", { name })}</Text>
-        <ActionButton
-          label={t("cancelCopy")}
-          icon="X"
-          onPress={cancel}
-          theme={theme}
-          disabled={isPending}
-        />
-      </View>
+      {!compact && (
+        <View style={styles.heading}>
+          <Text style={styles.headingText}>{t("copyNameTo", { name })}</Text>
+          <ActionButton
+            label={t("cancelCopy")}
+            icon="X"
+            onPress={cancel}
+            theme={theme}
+            disabled={isPending}
+          />
+        </View>
+      )}
       {destination ? (
         <>
           <View style={styles.selection}>
@@ -287,6 +305,17 @@ export function CopyDestination({
         </Text>
       ) : null}
     </View>
+  );
+  if (!compact) return picker;
+  return (
+    <>
+      <ActionButton label={t("copyTo")} icon="Ellipsis" onPress={show} theme={theme} />
+      {open && (
+        <Modal title={t("copyNameTo", { name })} open={open} onOpenChange={dismiss}>
+          <Modal.Content>{picker}</Modal.Content>
+        </Modal>
+      )}
+    </>
   );
 }
 

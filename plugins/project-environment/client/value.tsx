@@ -24,6 +24,7 @@ interface ValueControlsProps {
   description: string;
   theme: PluginTheme;
   children?: ReactNode;
+  compact?: boolean;
 }
 export function ValueControls({
   target,
@@ -33,6 +34,7 @@ export function ValueControls({
   description,
   theme,
   children,
+  compact = false,
 }: ValueControlsProps) {
   const { t } = useTranslation(messages);
   const read = useRpc(readVariableValue);
@@ -80,6 +82,7 @@ export function ValueControls({
         fontSize: 14,
         fontWeight: "600" as const,
         flexShrink: 1,
+        flexGrow: compact ? 1 : 0,
         minWidth: 0,
       },
       heading: {
@@ -88,7 +91,7 @@ export function ValueControls({
         alignItems: "center" as const,
       },
     }),
-    [theme],
+    [theme, compact],
   );
   const busy = state.pending !== null;
   let messageStyle = styles.detail;
@@ -119,6 +122,9 @@ export function ValueControls({
             />
           </>
         )}
+        {compact && (
+          <CopyDestination name={name} source={target} hostId={hostId} theme={theme} compact />
+        )}
       </View>
       {proxyUrl && <Text style={styles.detail}>IronProxy · GET {proxyUrl}</Text>}
       {description ? <Text style={styles.detail}>{description}</Text> : null}
@@ -132,9 +138,11 @@ export function ValueControls({
           {t(state.message)}
         </Text>
       ) : null}
-      <CopyDestination name={name} source={target} hostId={hostId} theme={theme}>
-        {children}
-      </CopyDestination>
+      {!compact && (
+        <CopyDestination name={name} source={target} hostId={hostId} theme={theme}>
+          {children}
+        </CopyDestination>
+      )}
     </>
   );
 }

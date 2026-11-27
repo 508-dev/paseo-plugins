@@ -167,6 +167,7 @@ export function filterVariableCatalogue(
   query: string,
 ): CatalogueProject[] {
   const terms = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+  if (!terms.length) return projects;
   function matches({ name, description }: z.infer<typeof variableMetadata>) {
     const text = `${name}\n${description}`.toLocaleLowerCase();
     return terms.every((term) => text.includes(term));
@@ -175,9 +176,7 @@ export function filterVariableCatalogue(
     const variables = project.variables.filter(matches);
     const workspaces = project.workspaces.flatMap((workspace) => {
       const localVariables = workspace.variables.filter(matches);
-      return variables.length || localVariables.length
-        ? [{ ...workspace, variables: localVariables }]
-        : [];
+      return localVariables.length ? [{ ...workspace, variables: localVariables }] : [];
     });
     return variables.length || workspaces.length ? [{ ...project, variables, workspaces }] : [];
   });

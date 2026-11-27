@@ -164,6 +164,10 @@ test("Git worktrees inherit project defaults and can override them independently
   expect(matched.workspaces.map(({ id, variables }) => ({ id, variables }))).toEqual([
     { id: "worktree", variables: [{ name: "API_KEY", description: "Worktree override" }] },
   ]);
+  const [defaultMatch] = filterVariableCatalogue(catalogue.projects, "API_KEY");
+  expect(defaultMatch.variables).toHaveLength(1);
+  expect(defaultMatch.workspaces.map(({ id }) => id)).toEqual(["worktree"]);
+  expect(filterVariableCatalogue(catalogue.projects, " ")[0].workspaces).toHaveLength(2);
   expect(variableCatalogue.output.safeParse(catalogue).success).toBe(true);
   expect(JSON.stringify(catalogue)).not.toContain("worktree-key-test-value");
   await store.remove(mainScope, "API_KEY");
