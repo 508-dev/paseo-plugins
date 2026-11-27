@@ -30,8 +30,7 @@ export function CopyDestination({
   theme,
   children,
   compact = false,
-  showAction = true,
-  onAction,
+  onClose,
 }: {
   name: string;
   source: VariableTarget;
@@ -39,15 +38,14 @@ export function CopyDestination({
   theme: PluginTheme;
   children?: ReactNode;
   compact?: boolean;
-  showAction?: boolean;
-  onAction?(): void;
+  onClose?(): void;
 }) {
   const { t } = useTranslation(messages);
   const toast = useToast();
   const list = useRpc(variableDestinations);
   const copy = useRpc(copyVariable);
   const queryClient = useQueryClient();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(compact);
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState<Destination["target"]["kind"]>("project");
   const [visible, setVisible] = useState(PAGE_SIZE);
@@ -66,6 +64,7 @@ export function CopyDestination({
       if (result.status === "exists") setRequiresOverwrite(true);
       if (result.status !== "copied" && result.status !== "overwritten") return;
       setOpen(false);
+      onClose?.();
       if (compact && destination)
         toast.show(
           t(result.status === "overwritten" ? "overwrittenTo" : "copiedTo", {
@@ -79,7 +78,6 @@ export function CopyDestination({
   });
   const { mutate, reset, isPending } = transfer;
   const show = useCallback(() => {
-    onAction?.();
     reset();
     setQuery("");
     setScope("project");
@@ -87,11 +85,12 @@ export function CopyDestination({
     setRequiresOverwrite(false);
     setDestination(null);
     setOpen(true);
-  }, [reset, onAction]);
+  }, [reset]);
   const cancel = useCallback(() => {
     reset();
     setOpen(false);
-  }, [reset]);
+    onClose?.();
+  }, [reset, onClose]);
   const dismiss = useCallback(
     (next: boolean) => {
       if (!next && !isPending) cancel();
@@ -314,7 +313,6 @@ export function CopyDestination({
   if (!compact) return picker;
   return (
     <>
-      {showAction && <ActionButton label={t("copyTo")} onPress={show} theme={theme} />}
       {open && (
         <Modal title={t("copyNameTo", { name })} open={open} onOpenChange={dismiss}>
           <Modal.Content>{picker}</Modal.Content>

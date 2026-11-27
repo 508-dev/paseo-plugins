@@ -11,6 +11,7 @@ import { AppState, Text, View } from "react-native";
 import type { PluginTheme } from "@getpaseo/plugin";
 import { useTranslation, useRpc } from "@getpaseo/plugin/client";
 import { copyText } from "@getpaseo/plugin/client/ui";
+import { VariableMenu, type VariableAction } from "./variable-menu";
 import { ProtectControl } from "./protect-control";
 import { readVariableValue, type AllowedRequest, type VariableTarget } from "../shared/environment";
 import { ActionButton } from "./action-button";
@@ -42,9 +43,8 @@ export function ValueControls({
   compact = false,
 }: ValueControlsProps) {
   const { t } = useTranslation(messages);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const toggleMenu = useCallback(() => setMenuOpen((open) => !open), []);
-  const closeMenu = useCallback(() => setMenuOpen(false), []);
+  const [action, setAction] = useState<VariableAction | null>(null);
+  const closeAction = useCallback(() => setAction(null), []);
   const read = useRpc(readVariableValue);
   const [controller] = useState(
     () =>
@@ -93,14 +93,6 @@ export function ValueControls({
         flexGrow: compact ? 1 : 0,
         minWidth: 0,
       },
-      menu: {
-        flexDirection: "row" as const,
-        flexWrap: "wrap" as const,
-        gap: 6,
-        alignSelf: "flex-end" as const,
-        backgroundColor: theme.colors.surface2,
-        borderRadius: 8,
-      },
       heading: {
         flexDirection: "row" as const,
         gap: compact ? 0 : 4,
@@ -141,34 +133,30 @@ export function ValueControls({
           </>
         )}
         {compact && (
-          <ActionButton
-            icon="Ellipsis"
-            label={t("variableActions")}
-            expanded={menuOpen}
-            onPress={toggleMenu}
+          <VariableMenu
             theme={theme}
-            compact
+            protectedCredential={Boolean(proxyUrl)}
+            onSelect={setAction}
           />
         )}
       </View>
-      {compact && (
-        <View style={styles.menu}>
-          <CopyDestination
-            name={name}
-            source={target}
-            hostId={hostId}
-            theme={theme}
-            compact
-            showAction={menuOpen}
-            onAction={closeMenu}
-          />
-          <ProtectControl
-            {...{ name, target, hostId, theme, proxyUrl, proxyMethod, requests }}
-            workspaceId={target.kind === "workspace" ? target.workspaceId : undefined}
-            showAction={menuOpen}
-            onAction={closeMenu}
-          />
-        </View>
+      {action === "copy" && (
+        <CopyDestination
+          name={name}
+          source={target}
+          hostId={hostId}
+          theme={theme}
+          compact
+          onClose={closeAction}
+        />
+      )}
+      {action === "protect" && (
+        <ProtectControl
+          {...{ name, target, hostId, theme, proxyUrl, proxyMethod, requests }}
+          workspaceId={target.kind === "workspace" ? target.workspaceId : undefined}
+          dialogOnly
+          onClose={closeAction}
+        />
       )}
       {proxyUrl && (
         <Text style={styles.detail}>

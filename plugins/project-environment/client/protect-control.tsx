@@ -23,8 +23,8 @@ export function ProtectControl({
   proxyUrl,
   proxyMethod,
   requests,
-  showAction = true,
-  onAction,
+  dialogOnly = false,
+  onClose,
 }: {
   name: string;
   target: VariableTarget;
@@ -34,14 +34,14 @@ export function ProtectControl({
   proxyUrl?: string;
   proxyMethod?: AllowedRequest["method"];
   requests?: AllowedRequest[];
-  showAction?: boolean;
-  onAction?(): void;
+  dialogOnly?: boolean;
+  onClose?(): void;
 }) {
   const scope = target.kind;
   const { t } = useTranslation(messages);
   const configure = useRpc(configureProxy);
   const cache = useQueryClient();
-  const [routing, setRouting] = useState(false);
+  const [routing, setRouting] = useState(dialogOnly);
   const [items, setItems] = useState(requests ?? []);
   const [method, setMethod] = useState<AllowedRequest["method"]>(proxyMethod ?? "GET");
   const [route, setUrl] = useState(proxyUrl ?? "");
@@ -68,6 +68,7 @@ export function ProtectControl({
           ),
         );
         setRouting(false);
+        onClose?.();
       } catch {
         setRouteError(
           "Could not change credential access. Check the saved entry and install the approved IronProxy v0.61.0 binary on the Paseo host.",
@@ -76,24 +77,38 @@ export function ProtectControl({
         setBusy(false);
       }
     },
-    [name, proxyUrl, configure, target, cache, hostId, proxyMethod, method, requests, items],
+    [
+      name,
+      proxyUrl,
+      configure,
+      target,
+      cache,
+      hostId,
+      proxyMethod,
+      method,
+      requests,
+      items,
+      onClose,
+    ],
   );
   const saveRoute = useCallback(() => void apply(route), [apply, route]);
   const clearRoute = useCallback(() => void apply(null), [apply]);
   const toggleRouting = useCallback(() => {
-    onAction?.();
     setMethod(proxyMethod ?? "GET");
     setItems(requests ?? []);
     setUrl(proxyUrl ?? "");
     setRouteError("");
     setRouting((open) => !open);
-  }, [requests, proxyUrl, proxyMethod, onAction]);
-  const closeRouting = useCallback(() => setRouting(false), []);
+  }, [requests, proxyUrl, proxyMethod]);
+  const closeRouting = useCallback(() => {
+    setRouting(false);
+    onClose?.();
+  }, [onClose]);
   const dismiss = useCallback(
     (open: boolean) => {
-      if (!busy) setRouting(open);
+      if (!busy && !open) closeRouting();
     },
-    [busy],
+    [busy, closeRouting],
   );
   const styles = useMemo(
     () => ({
@@ -109,7 +124,7 @@ export function ProtectControl({
   );
   return (
     <>
-      {showAction && (
+      {!dialogOnly && (
         <ActionButton
           label={proxyUrl ? "Protected settings" : "Protect"}
           onPress={toggleRouting}
