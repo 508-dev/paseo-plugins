@@ -1,4 +1,9 @@
 {
+  "proxyChecking": "正在检查主机…",
+  "proxyUnavailable": "无法获取状态",
+  "proxyVerified": "二进制文件已验证",
+  "proxySetupRequired": "需要配置",
+  "proxyRecheck": "重新检查",
   "variables": "环境变量",
   "environment": "环境",
   "projectEnvironment": "项目环境",

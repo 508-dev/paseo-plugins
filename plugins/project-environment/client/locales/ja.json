@@ -1,4 +1,9 @@
 {
+  "proxyChecking": "ホストを確認中…",
+  "proxyUnavailable": "ステータスを取得できません",
+  "proxyVerified": "バイナリを検証済み",
+  "proxySetupRequired": "セットアップが必要",
+  "proxyRecheck": "再確認",
   "variables": "環境変数",
   "environment": "環境",
   "projectEnvironment": "プロジェクト環境",

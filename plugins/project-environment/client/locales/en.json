@@ -1,4 +1,9 @@
 {
+  "proxyChecking": "Checking host…",
+  "proxyUnavailable": "Status unavailable",
+  "proxyVerified": "Binary verified",
+  "proxySetupRequired": "Setup required",
+  "proxyRecheck": "Recheck",
   "variables": "Environment variables",
   "environment": "Environment",
   "projectEnvironment": "Project environment",

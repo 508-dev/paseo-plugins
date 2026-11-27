@@ -23,6 +23,14 @@ import { VariableValueController } from "../client/value-controller";
 import { SavedVariableEditor } from "../client/saved-variable-editor";
 import { EnvironmentEditor } from "../client/editor";
 
+import { proxyStatusPresentation } from "../client/proxy-status-presentation";
+import en from "../client/locales/en.json";
+import es from "../client/locales/es.json";
+import ja from "../client/locales/ja.json";
+import ko from "../client/locales/ko.json";
+import zhCN from "../client/locales/zh-CN.json";
+import zhTW from "../client/locales/zh-TW.json";
+
 const execFileAsync = promisify(execFile);
 const cleanup: Array<() => Promise<unknown>> = [];
 afterEach(async () => {
@@ -774,3 +782,57 @@ test("catalogue protection supports a write-only first request on a project with
   ).rejects.toThrow("changed");
   await expect(store.readValue(scope, "WRITE")).rejects.toThrow("IronProxy");
 });
+
+test("proxy status allows retry after a refresh fails with verified data still cached", () => {
+  expect(proxyStatusPresentation({ ready: true, isFetching: false, isError: true })).toEqual({
+    label: "proxyUnavailable",
+    canRecheck: true,
+  });
+  expect(proxyStatusPresentation({ ready: true, isFetching: false, isError: false })).toEqual({
+    label: "proxyVerified",
+    canRecheck: false,
+  });
+});
+
+test("all supported locales translate the proxy status and Recheck", () => {
+  const keys = [
+    "proxyChecking",
+    "proxyUnavailable",
+    "proxyVerified",
+    "proxySetupRequired",
+    "proxyRecheck",
+  ] as const;
+  for (const locale of [es, ja, ko, zhCN, zhTW]) {
+    for (const key of keys) {
+      expect(locale[key].trim()).not.toBe("");
+      expect(locale[key]).not.toBe(en[key]);
+    }
+  }
+});
+
+test.each([undefined, "PUT"] as const)(
+  "a stale save preserves the stored proxy configuration with method %s",
+  async (proxyMethod) => {
+    const { scope, store } = await fixture();
+    const saved = {
+      name: "TEST_TOKEN",
+      value: "fixture",
+      description: "original",
+      proxyUrl: "https://example.com/account",
+      proxyMethod,
+      requests: [{ id: "list", method: "GET" as const, url: "https://example.com/items" }],
+    };
+    await store.save(scope, saved);
+    await store.save(scope, {
+      name: saved.name,
+      value: "replacement",
+      description: "updated",
+      proxyUrl: "https://example.com/other",
+      proxyMethod: "DELETE",
+      requests: [],
+    });
+    expect(await store.read(scope)).toEqual([
+      { ...saved, value: "replacement", description: "updated" },
+    ]);
+  },
+);

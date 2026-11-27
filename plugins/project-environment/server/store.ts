@@ -181,10 +181,10 @@ export class EnvironmentStore {
       const next = variables.filter((entry) => entry.name !== variable.name);
       if (next.length >= 256) throw new Error("A scope can have at most 256 variables");
       const previous = variables.find((entry) => entry.name === variable.name);
-      return [
-        ...next,
-        { ...previous, ...parsed.data, proxyUrl: previous?.proxyUrl ?? parsed.data.proxyUrl },
-      ].toSorted((a, b) => a.name.localeCompare(b.name));
+      const { description, value } = parsed.data;
+      // Existing route policies are changed together through configureProxy.
+      const entry = previous ? { ...previous, description, value } : parsed.data;
+      return [...next, entry].toSorted((a, b) => a.name.localeCompare(b.name));
     });
   }
 
