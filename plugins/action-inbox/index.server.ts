@@ -7,4 +7,5 @@ export default function contribute(server: PluginServerContext) {
     callPrWatcher({ operation: "list", ...input }, listPullRequests.output),
   );
   server.handle(pullRequestAction, (input) => callPrWatcher(input, pullRequestAction.output));
+  return () => {};
 }
