@@ -11,7 +11,7 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --config client/vitest.config.ts client/inbox-model.test.ts --bail=1",
+    "test": "vitest run --config client/vitest.config.ts client/inbox-model.test.ts client/pull-request-pages.test.ts --bail=1",
     "lint": "oxlint .",
     "format": "oxfmt .",
     "format:check": "oxfmt --check ."

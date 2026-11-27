@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, Text, View } from "react-native";
 import {
   openExternalUrl,
@@ -17,6 +17,12 @@ import {
 } from "../shared/pull-requests";
 import { InboxButton } from "./inbox-controls";
 import { messages } from "./messages";
+import {
+  collectPullRequestPages,
+  replacePullRequestPage,
+  updatePagedPullRequests,
+  type PullRequestPages,
+} from "./pull-request-pages";
 
 type Selection = { pullRequest: InboxPullRequest; operation: "watch" | "fix"; messageId: string };
 
@@ -55,29 +61,16 @@ function needsAttention(pr: InboxPullRequest) {
   );
 }
 
-function mergePages(current: InboxPullRequest[], next: InboxPullRequest[]) {
-  const key = (pr: InboxPullRequest) => pr.url.toLowerCase();
-  const rows = new Map(current.map((pr) => [key(pr), pr]));
-  for (const pr of next) {
-    const previous = rows.get(key(pr));
-    const targets = new Map(previous?.targets.map((target) => [target.workspaceId, target]));
-    for (const target of pr.targets) targets.set(target.workspaceId, target);
-    rows.set(key(pr), { ...pr, targets: [...targets.values()] });
-  }
-  return [...rows.values()];
-}
-
 export function PullRequestsScreen({ theme, layout, host, navigation }: PluginScreenProps) {
   const { t } = useTranslation(messages);
   const list = useRpc(listPullRequests);
   const act = useRpc(pullRequestAction);
-  const [rows, setRows] = useState<InboxPullRequest[]>([]);
-  const [cursor, setCursor] = useState<string | null>(null);
+  const [pages, setPages] = useState<PullRequestPages>(() => new Map());
+  const { rows, skipped, cursor } = useMemo(() => collectPullRequestPages(pages), [pages]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [onlyAttention, setOnlyAttention] = useState(true);
   const [error, setError] = useState("");
-  const [skipped, setSkipped] = useState<string[]>([]);
   const [selection, setSelection] = useState<Selection | null>(null);
   const [sent, setSent] = useState<Record<string, { agentId: string; name: string }>>({});
   const version = useRef(0);
@@ -96,11 +89,7 @@ export function PullRequestsScreen({ theme, layout, host, navigation }: PluginSc
       const apply = (result: Awaited<ReturnType<typeof list>>) => {
         if (request !== version.current || watchesAtStart !== watchVersion.current) return;
         hasLoaded.current = true;
-        setRows((current) => mergePages(page ? current : [], result.pullRequests));
-        setCursor(result.nextCursor);
-        setSkipped((previous) => [
-          ...new Set(page ? [...previous, ...result.errors] : result.errors),
-        ]);
+        setPages((current) => replacePullRequestPage(current, page, result));
       };
       try {
         const result = await list({ cursor: page, refresh: force ? "force" : undefined });
@@ -133,8 +122,11 @@ export function PullRequestsScreen({ theme, layout, host, navigation }: PluginSc
   async function stopWatch(id: string) {
     await act({ operation: "stop", id });
     watchVersion.current += 1;
-    setRows((current) =>
-      current.map((pr) => ({ ...pr, watches: pr.watches.filter((item) => item.id !== id) })),
+    setPages((current) =>
+      updatePagedPullRequests(current, (pr) => ({
+        ...pr,
+        watches: pr.watches.filter((item) => item.id !== id),
+      })),
     );
   }
 
@@ -252,7 +244,7 @@ export function PullRequestsScreen({ theme, layout, host, navigation }: PluginSc
             <InboxButton
               {...buttons}
               variant="outline"
-              disabled={loading}
+              disabled={loading || updating}
               onPress={() => void refresh(cursor)}
             >
               {t("prMore")}
@@ -395,9 +387,9 @@ export function PullRequestsScreen({ theme, layout, host, navigation }: PluginSc
             if (result.watch) {
               watchVersion.current += 1;
               const watch = result.watch;
-              setRows((current) =>
-                current.map((row) =>
-                  row.url === selection.pullRequest.url
+              setPages((current) =>
+                updatePagedPullRequests(current, (row) =>
+                  row.url.toLowerCase() === selection.pullRequest.url.toLowerCase()
                     ? {
                         ...row,
                         watches: [...row.watches.filter((item) => item.id !== watch.id), watch],
