@@ -3,6 +3,7 @@
   "environment": "環境",
   "projectEnvironment": "專案環境",
   "searchEnvironment": "搜尋環境變數",
+  "workspacePicker": "工作區",
   "openVariables": "開啟變數",
   "directoryUnavailable": "原始專案位置無法存取。",
   "projectDefaults": "專案預設值",

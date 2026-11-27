@@ -2,7 +2,7 @@ import { messages } from "./messages";
 import { useCallback, useMemo, useState } from "react";
 import { Text, View } from "react-native";
 import { useTranslation, type PluginScreenProps, useRpc } from "@getpaseo/plugin/client";
-import { ScrollView } from "@getpaseo/plugin/client/ui";
+import { Icon, ScrollView, SettingsSelect } from "@getpaseo/plugin/client/ui";
 import { useQuery } from "@tanstack/react-query";
 import {
   filterVariableCatalogue,
@@ -32,6 +32,7 @@ interface WorkspaceResultsProps {
   openEditor: OpenEditor;
   theme: PluginScreenProps["theme"];
 }
+const workspaceStyles = { section: { gap: 10 }, action: { alignSelf: "flex-start" as const } };
 function WorkspaceResults({ workspace, openEditor, theme, hostId }: WorkspaceResultsProps) {
   const { t } = useTranslation(messages);
   const open = useCallback(() => openEditor(workspace.id), [workspace.id, openEditor]);
@@ -39,23 +40,9 @@ function WorkspaceResults({ workspace, openEditor, theme, hostId }: WorkspaceRes
     () => ({ kind: "workspace" as const, workspaceId: workspace.id }),
     [workspace.id],
   );
-  const styles = useMemo(
-    () => ({
-      section: { gap: 10 },
-      row: {
-        flexDirection: "row" as const,
-        flexWrap: "wrap" as const,
-        gap: 10,
-        alignItems: "center" as const,
-      },
-      name: { color: theme.colors.foregroundMuted, fontSize: 13, flexShrink: 1 },
-    }),
-    [theme],
-  );
   return (
-    <View style={styles.section}>
-      <View style={styles.row}>
-        <Text style={styles.name}>{workspace.name}</Text>
+    <View style={workspaceStyles.section}>
+      <View style={workspaceStyles.action}>
         <ActionButton label={t("openVariables")} onPress={open} theme={theme} />
       </View>
       {workspace.variables.map((variable) => (
@@ -72,6 +59,19 @@ function WorkspaceResults({ workspace, openEditor, theme, hostId }: WorkspaceRes
 }
 function ProjectResults({ project, theme, openEditor, hostId }: ProjectResultsProps) {
   const { t } = useTranslation(messages);
+  const [selectedId, selectWorkspace] = useState("");
+  const workspace =
+    project.workspaces.find((entry) => entry.id === selectedId) ??
+    project.workspaces.find((entry) => entry.variables.length > 0) ??
+    project.workspaces[0];
+  const options = useMemo(
+    () =>
+      project.workspaces.map((entry) => ({
+        value: entry.id,
+        label: entry.name,
+      })),
+    [project.workspaces],
+  );
   const target = useMemo(
     () => ({ kind: "project" as const, scopeId: project.scopeId }),
     [project.scopeId],
@@ -79,18 +79,37 @@ function ProjectResults({ project, theme, openEditor, hostId }: ProjectResultsPr
   const styles = useMemo(
     () => ({
       section: { gap: 10 },
-      title: { color: theme.colors.foreground, fontSize: 15, fontWeight: "600" as const },
-      detail: { color: theme.colors.foregroundMuted, fontSize: 13 },
+      line: { flexDirection: "row" as const, gap: 8, alignItems: "center" as const },
+      title: {
+        flexShrink: 1,
+        color: theme.colors.foreground,
+        fontSize: 15,
+        fontWeight: "600" as const,
+      },
+      detail: { flexShrink: 1, color: theme.colors.foregroundMuted, fontSize: 13 },
     }),
     [theme],
   );
   return (
     <View style={styles.section}>
-      <Text style={styles.title}>{project.name}</Text>
-      <Text selectable style={styles.detail}>
-        {project.directory ?? t("directoryUnavailable")}
-      </Text>
-      {project.variables.length ? <Text style={styles.detail}>{t("projectDefaults")}</Text> : null}
+      <View style={styles.line}>
+        <Icon name="Folder" size={18} color={theme.colors.accent} />
+        <Text accessibilityRole="header" style={styles.title}>
+          {project.name}
+        </Text>
+      </View>
+      <View style={styles.line}>
+        <Icon name="FolderTree" size={14} color={theme.colors.foregroundMuted} />
+        <Text selectable style={styles.detail}>
+          {project.directory ?? t("directoryUnavailable")}
+        </Text>
+      </View>
+      {project.variables.length ? (
+        <View style={styles.line}>
+          <Icon name="Layers" size={15} color={theme.colors.foregroundMuted} />
+          <Text style={styles.detail}>{t("projectDefaults")}</Text>
+        </View>
+      ) : null}
       {project.variables.map((variable) => (
         <VariableResult
           key={JSON.stringify([variable.name, variable.proxyUrl])}
@@ -100,18 +119,25 @@ function ProjectResults({ project, theme, openEditor, hostId }: ProjectResultsPr
           theme={theme}
         />
       ))}
-      {project.workspaces.map((workspace) => (
-        <WorkspaceResults
-          key={workspace.id}
-          workspace={workspace}
-          hostId={hostId}
-          openEditor={openEditor}
-          theme={theme}
-        />
-      ))}
-      {!project.workspaces.length ? (
+      {workspace ? (
+        <>
+          <SettingsSelect
+            label={t("workspacePicker")}
+            value={workspace.id}
+            options={options}
+            onValueChange={selectWorkspace}
+          />
+          <WorkspaceResults
+            key={workspace.id}
+            workspace={workspace}
+            hostId={hostId}
+            openEditor={openEditor}
+            theme={theme}
+          />
+        </>
+      ) : (
         <Text style={styles.detail}>{t("noActiveWorkspace")}</Text>
-      ) : null}
+      )}
     </View>
   );
 }

@@ -3,6 +3,7 @@
   "environment": "Environment",
   "projectEnvironment": "Project environment",
   "searchEnvironment": "Search environment variables",
+  "workspacePicker": "Workspace",
   "openVariables": "Open variables",
   "directoryUnavailable": "The original project location is unavailable.",
   "projectDefaults": "Project defaults",

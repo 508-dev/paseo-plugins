@@ -3,6 +3,7 @@
   "environment": "環境",
   "projectEnvironment": "プロジェクト環境",
   "searchEnvironment": "環境変数を検索",
+  "workspacePicker": "ワークスペース",
   "openVariables": "変数を開く",
   "directoryUnavailable": "元のプロジェクトの場所を参照できません。",
   "projectDefaults": "プロジェクトの既定値",
