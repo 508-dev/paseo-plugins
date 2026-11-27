@@ -1,38 +1,21 @@
-import { requestMethod, type AllowedRequest } from "../shared/environment";
-import { useCallback, useMemo } from "react";
-import { Text, View } from "react-native";
+import { proxyRoute, requestMethod, type AllowedRequest } from "../shared/environment";
+import { useCallback, useMemo, useState } from "react";
+import { Text, View, type LayoutChangeEvent } from "react-native";
 import type { PluginTheme } from "@getpaseo/plugin";
 import { SettingsSelect } from "@getpaseo/plugin/client/ui";
 import { Field } from "./field";
 
-import { ActionButton } from "./action-button";
-const methodRow = { flexDirection: "row", flexWrap: "wrap", gap: 6 } as const;
-type Method = AllowedRequest["method"];
-function MethodButton({
-  value,
-  method,
-  setMethod,
-  theme,
-  disabled,
-}: {
-  value: Method;
-  method: Method;
-  setMethod(value: Method): void;
-  theme: PluginTheme;
-  disabled: boolean;
-}) {
-  const choose = useCallback(() => setMethod(value), [value, setMethod]);
-  return (
-    <ActionButton
-      label={value}
-      variant={method === value ? "primary" : "outline"}
-      selected={method === value}
-      theme={theme}
-      onPress={choose}
-      disabled={disabled}
-    />
-  );
-}
+const methods = requestMethod.options.map((value) => ({ label: value, value }));
+const requestRow = {
+  flexDirection: "row",
+  flexWrap: "wrap",
+  alignItems: "center",
+  gap: 8,
+} as const;
+const stacked = { gap: 8 } as const;
+const endpoint = { flexBasis: 260, flexGrow: 1, minWidth: 0 } as const;
+const picker = { maxWidth: 400, width: "100%" } as const;
+
 const presets = [
   { label: "Custom endpoint", value: "" },
   { label: "Cloudflare · List zones", value: "https://api.cloudflare.com/client/v4/zones" },
@@ -59,7 +42,32 @@ export function ProxyRouteField({
   method: AllowedRequest["method"];
   setMethod(value: AllowedRequest["method"]): void;
 }) {
-  const detail = useMemo(() => ({ color: theme.colors.foregroundMuted, fontSize: 13 }), [theme]);
+  const [compact, setCompact] = useState(true);
+  const measure = useCallback((event: LayoutChangeEvent) => {
+    setCompact(event.nativeEvent.layout.width < 560);
+  }, []);
+  const valid = proxyRoute.safeParse(value).success;
+  const detail = useMemo(
+    () => ({
+      color:
+        value && (!valid || method !== "GET")
+          ? theme.colors.statusWarning
+          : theme.colors.foregroundMuted,
+      fontSize: 13,
+    }),
+    [value, valid, method, theme],
+  );
+  const group = useMemo(
+    () => ({
+      backgroundColor: theme.colors.surface0,
+      borderColor: theme.colors.border,
+      borderWidth: 1,
+      borderRadius: 8,
+      padding: 12,
+      gap: 8,
+    }),
+    [theme],
+  );
   const preset = presets.some((option) => option.value === value) ? value : "";
   const selectPreset = useCallback(
     (url: string) => {
@@ -68,8 +76,15 @@ export function ProxyRouteField({
     },
     [onChangeText, setMethod],
   );
-  return (
-    <>
+  let hint =
+    method === "GET"
+      ? "Agents can read from this endpoint."
+      : `Agents can send ${method} requests to this endpoint with their own JSON bodies.`;
+  if (!value) hint = "Choose a preset or enter an exact HTTPS URL.";
+  else if (!valid)
+    hint = "Use an exact public HTTPS URL without a query string, fragment, or wildcard.";
+  const presetPicker = (
+    <View style={picker}>
       <SettingsSelect
         label="API preset"
         value={method === "GET" ? preset : ""}
@@ -77,25 +92,32 @@ export function ProxyRouteField({
         onValueChange={selectPreset}
         disabled={disabled}
       />
-      <Text style={detail}>HTTP method</Text>
-      <View style={methodRow}>
-        {requestMethod.options.map((verb) => (
-          <MethodButton key={verb} value={verb} {...{ method, setMethod, theme, disabled }} />
-        ))}
+    </View>
+  );
+  return (
+    <View style={group} onLayout={measure}>
+      {compact && presetPicker}
+      <View style={compact ? stacked : requestRow}>
+        <SettingsSelect
+          label="HTTP method"
+          value={method}
+          options={methods}
+          onValueChange={setMethod}
+          disabled={disabled}
+        />
+        <View style={compact ? undefined : endpoint}>
+          <Field
+            label="HTTPS endpoint"
+            value={value}
+            onChangeText={onChangeText}
+            theme={theme}
+            disabled={disabled}
+            placeholder="https://api.example.com/v1/account"
+          />
+        </View>
       </View>
-      <Field
-        label="HTTPS endpoint"
-        value={value}
-        onChangeText={onChangeText}
-        theme={theme}
-        disabled={disabled}
-        placeholder="https://api.example.com/v1/account"
-      />
-      <Text style={detail}>
-        {method === "GET"
-          ? "Agents can read from this endpoint."
-          : "Saving allows agents to send " + method + " requests with their own JSON bodies."}
-      </Text>
-    </>
+      {!compact && presetPicker}
+      <Text style={detail}>{hint}</Text>
+    </View>
   );
 }

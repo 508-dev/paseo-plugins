@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from "react";
 import { View, Text } from "react-native";
 import type { PluginTheme } from "@getpaseo/plugin";
 import { useRpc, useTranslation } from "@getpaseo/plugin/client";
-import { Modal } from "@getpaseo/plugin/client/ui";
+import { Modal, useToast } from "@getpaseo/plugin/client/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   configureProxy,
@@ -39,6 +39,7 @@ export function ProtectControl({
 }) {
   const scope = target.kind;
   const { t } = useTranslation(messages);
+  const toast = useToast();
   const configure = useRpc(configureProxy);
   const cache = useQueryClient();
   const [routing, setRouting] = useState(dialogOnly);
@@ -62,13 +63,13 @@ export function ProtectControl({
           previousRequests: requests ?? [],
           requests: items,
         });
-        await Promise.all(
-          ["project-environment", "project-environment-catalogue"].map((key) =>
-            cache.invalidateQueries({ queryKey: [key, hostId] }),
-          ),
-        );
         setRouting(false);
         onClose?.();
+        toast.show(url ? `Protection saved for ${name}` : `Protection removed from ${name}`, {
+          variant: "success",
+        });
+        void cache.invalidateQueries({ queryKey: ["project-environment", hostId] });
+        void cache.invalidateQueries({ queryKey: ["project-environment-catalogue", hostId] });
       } catch {
         setRouteError(
           "Could not change credential access. Check the saved entry and install the approved IronProxy v0.61.0 binary on the Paseo host.",
@@ -89,6 +90,7 @@ export function ProtectControl({
       requests,
       items,
       onClose,
+      toast,
     ],
   );
   const saveRoute = useCallback(() => void apply(route), [apply, route]);
@@ -160,7 +162,7 @@ export function ProtectControl({
               />
               <ActionButton
                 variant="primary"
-                label="Save protection"
+                label={busy ? t("saving") : "Save protection"}
                 onPress={saveRoute}
                 disabled={busy || !proxyRoute.safeParse(route).success}
                 theme={theme}

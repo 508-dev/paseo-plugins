@@ -7,7 +7,7 @@ import {
   useRpc,
   useWorkspace,
 } from "@getpaseo/plugin/client";
-import { ScrollView } from "@getpaseo/plugin/client/ui";
+import { ScrollView, SettingsSwitch } from "@getpaseo/plugin/client/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { z } from "zod";
 import {
@@ -63,7 +63,6 @@ function ScopedEnvironment({
   const workspaceName = useWorkspace(workspaceId, (workspace) => workspace.name);
   const isProject = scope === "project";
   const [useProxy, setUseProxy] = useState(false);
-  const toggleProxy = useCallback(() => setUseProxy((active) => !active), []);
   const [url, setUrl] = useState("");
   const [method, setMethod] = useState<AllowedRequest["method"]>("GET");
   const list = useRpc(listVariables);
@@ -77,12 +76,10 @@ function ScopedEnvironment({
   const [notice, setNotice] = useState<
     { name: string } | { added: number; updated: number } | null
   >(null);
-  const invalidate = useCallback(async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["project-environment"] }),
-      queryClient.invalidateQueries({ queryKey: ["project-environment-catalogue"] }),
-    ]);
-  }, [queryClient]);
+  const invalidate = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ["project-environment-catalogue", host.id] });
+    return queryClient.invalidateQueries({ queryKey: ["project-environment", host.id] });
+  }, [queryClient, host.id]);
   const [bulk, setBulk] = useState(false);
   const openBulk = useCallback(() => {
     setNotice(null);
@@ -270,13 +267,12 @@ function ScopedEnvironment({
               theme={theme}
               disabled={pending}
             />
-            <ActionButton
+            <SettingsSwitch
               label="Protected"
-              selected={useProxy}
-              variant={useProxy ? "primary" : "outline"}
+              hint="Agents can use this credential only for the requests you allow."
+              value={useProxy}
+              onValueChange={setUseProxy}
               disabled={pending}
-              theme={theme}
-              onPress={toggleProxy}
             />
             {useProxy && (
               <ProxyRouteField
