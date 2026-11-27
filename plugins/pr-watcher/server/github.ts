@@ -20,6 +20,9 @@ export interface Review {
 
 export interface PullRequestSnapshot {
   state: string;
+  title?: string;
+  isDraft?: boolean;
+  reviewDecision?: string;
   headRefOid: string;
   mergeStateStatus: string;
   checks: Check[];
@@ -45,7 +48,8 @@ export function parsePullRequest(input: string): PullRequestRef {
   return { repository, number, url: `https://github.com/${repository}/pull/${number}` };
 }
 
-const fields = "state,headRefOid,mergeStateStatus,reviews,statusCheckRollup";
+const fields =
+  "state,title,isDraft,reviewDecision,headRefOid,mergeStateStatus,reviews,statusCheckRollup";
 
 export async function readPullRequest(ref: PullRequestRef): Promise<PullRequestSnapshot> {
   let stdout: string;
@@ -69,6 +73,9 @@ export async function readPullRequest(ref: PullRequestRef): Promise<PullRequestS
   }
   const raw = JSON.parse(stdout) as {
     state?: string;
+    title?: string;
+    isDraft?: boolean;
+    reviewDecision?: string;
     headRefOid?: string;
     mergeStateStatus?: string;
     reviews?: Array<{
@@ -83,6 +90,7 @@ export async function readPullRequest(ref: PullRequestRef): Promise<PullRequestS
       context?: string;
       conclusion?: string | null;
       state?: string | null;
+      status?: string | null;
       completedAt?: string | null;
       detailsUrl?: string | null;
       targetUrl?: string | null;
@@ -92,11 +100,14 @@ export async function readPullRequest(ref: PullRequestRef): Promise<PullRequestS
     throw new Error(`GitHub returned incomplete PR data for ${ref.url}.`);
   return {
     state: raw.state,
+    title: raw.title,
+    isDraft: raw.isDraft,
+    reviewDecision: raw.reviewDecision,
     headRefOid: raw.headRefOid,
     mergeStateStatus: raw.mergeStateStatus ?? "UNKNOWN",
     checks: (raw.statusCheckRollup ?? []).map((check) => ({
       name: check.name ?? check.context ?? "Check",
-      conclusion: check.conclusion ?? check.state ?? null,
+      conclusion: check.conclusion || check.state || check.status || null,
       completedAt: check.completedAt ?? null,
       detailsUrl: check.detailsUrl ?? check.targetUrl ?? null,
     })),

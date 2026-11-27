@@ -12,7 +12,7 @@ it("explicitly addresses github.com when the daemon has an Enterprise GH_HOST", 
       `#!${process.execPath}
 const args = process.argv.slice(2);
 if (args[args.indexOf("--repo") + 1] !== "github.com/owner/repo") process.exit(1);
-process.stdout.write(JSON.stringify({ state: "OPEN", headRefOid: "test-head", mergeStateStatus: "CLEAN" }));
+process.stdout.write(JSON.stringify({ state: "OPEN", title: "Modernize retries", isDraft: false, reviewDecision: "REVIEW_REQUIRED", headRefOid: "test-head", mergeStateStatus: "BLOCKED", statusCheckRollup: [{ name: "Build", status: "IN_PROGRESS", conclusion: "" }] }));
 `,
       { mode: 0o700 },
     );
@@ -20,9 +20,12 @@ process.stdout.write(JSON.stringify({ state: "OPEN", headRefOid: "test-head", me
     vi.stubEnv("GH_HOST", "enterprise.invalid");
     expect(await readPullRequest(parsePullRequest("owner/repo#1"))).toEqual({
       state: "OPEN",
+      title: "Modernize retries",
+      isDraft: false,
+      reviewDecision: "REVIEW_REQUIRED",
       headRefOid: "test-head",
-      mergeStateStatus: "CLEAN",
-      checks: [],
+      mergeStateStatus: "BLOCKED",
+      checks: [{ name: "Build", conclusion: "IN_PROGRESS", completedAt: null, detailsUrl: null }],
       reviews: [],
     });
   } finally {

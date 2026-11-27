@@ -5,7 +5,7 @@ export interface WatchEvent {
   line: string;
 }
 
-const failedConclusions = new Set([
+export const failedConclusions = new Set([
   "FAILURE",
   "ERROR",
   "TIMED_OUT",

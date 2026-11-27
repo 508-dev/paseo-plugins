@@ -1,11 +1,13 @@
 import { messages } from "./client/messages.js";
 import type { PluginClientContext } from "@getpaseo/plugin/client";
 import { WatchScreen } from "./client/watch-screen.js";
-import { addWatch } from "./shared/contracts.js";
+import { addWatch, listWatches } from "./shared/contracts.js";
 import { contributeWorkspaceControls } from "./client/workspace-controls.js";
 import { watchChanged } from "./client/watch-events.js";
 
 export default function contribute(client: PluginClientContext) {
+  // Attach the host's SDK session even when a user opens Action Inbox first.
+  void client.rpc(listWatches, {}).catch(() => undefined);
   client.addScreen({ id: "watches", title: messages.message("watcher"), Component: WatchScreen });
   client.addCommandCenterItem({
     id: "open-watches",
