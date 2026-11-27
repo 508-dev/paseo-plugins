@@ -116,5 +116,8 @@
   "prNoIdleAgents": "請等到有閒置的代理程式後再傳送修正請求。",
   "prAgentUnavailable": "無法使用",
   "prHost": "主機：{{host}}",
-  "prWatchAnother": "使用其他代理程式追蹤"
+  "prWatchAnother": "使用其他代理程式追蹤",
+  "prWatchSettings": "管理追蹤",
+  "prNoWatches": "沒有代理程式正在追蹤此提取要求。",
+  "prStopWatchFor": "停止 {{agent}} 的追蹤"
 }

@@ -116,5 +116,8 @@
   "prNoIdleAgents": "에이전트가 대기 상태가 되면 수정 요청을 보내세요.",
   "prAgentUnavailable": "사용 불가",
   "prHost": "{{host}}에서",
-  "prWatchAnother": "다른 에이전트로 감시"
+  "prWatchAnother": "다른 에이전트로 감시",
+  "prWatchSettings": "감시 관리",
+  "prNoWatches": "이 PR을 감시하는 에이전트가 없습니다.",
+  "prStopWatchFor": "{{agent}}의 감시 중지"
 }

@@ -116,5 +116,8 @@
   "prNoIdleAgents": "エージェントが待機状態になってから修正を依頼してください。",
   "prAgentUnavailable": "利用不可",
   "prHost": "{{host}} 上",
-  "prWatchAnother": "別のエージェントで監視"
+  "prWatchAnother": "別のエージェントで監視",
+  "prWatchSettings": "監視を管理",
+  "prNoWatches": "このPRを監視しているエージェントはいません。",
+  "prStopWatchFor": "{{agent}} の監視を停止"
 }

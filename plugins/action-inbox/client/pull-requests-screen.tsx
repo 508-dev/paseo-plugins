@@ -8,7 +8,7 @@ import {
   useTranslation,
   type PluginScreenProps,
 } from "@getpaseo/plugin/client";
-import { Modal } from "@getpaseo/plugin/client/ui";
+import { Icon, Modal } from "@getpaseo/plugin/client/ui";
 import type { PluginAgentSnapshot } from "@getpaseo/plugin";
 import {
   listPullRequests,
@@ -41,13 +41,17 @@ const watchKeys = {
   paused: "prPaused",
 } as const;
 
+function watchNeedsAttention(watch: InboxPullRequest["watches"][number]) {
+  return watch.status === "paused" || watch.status === "uncertain" || Boolean(watch.lastError);
+}
+
+function canAddWatch(pr: InboxPullRequest) {
+  return pr.targets.length > 0 && pr.status !== "closed" && pr.status !== "unavailable";
+}
+
 function needsAttention(pr: InboxPullRequest) {
   return (
-    pr.issues.length > 0 ||
-    pr.status === "unavailable" ||
-    pr.watches.some(
-      (watch) => watch.status === "paused" || watch.status === "uncertain" || watch.lastError,
-    )
+    pr.issues.length > 0 || pr.status === "unavailable" || pr.watches.some(watchNeedsAttention)
   );
 }
 
@@ -76,8 +80,7 @@ export function PullRequestsScreen({ theme, layout, host, navigation }: PluginSc
   const [selection, setSelection] = useState<Selection | null>(null);
   const [sent, setSent] = useState<Record<string, { agentId: string; name: string }>>({});
   const version = useRef(0);
-  const stopping = useRef(new Set<string>());
-  const [removingWatch, setRemovingWatch] = useState<string | null>(null);
+  const [managedUrl, setManagedUrl] = useState<string | null>(null);
   const buttons = { theme, compact: layout.compact };
   const muted = { color: theme.colors.foregroundMuted, fontSize: 13 };
   const refresh = useCallback(
@@ -110,21 +113,10 @@ export function PullRequestsScreen({ theme, layout, host, navigation }: PluginSc
   }, [refresh]);
 
   async function stopWatch(id: string) {
-    if (stopping.current.size > 0) return;
-    stopping.current.add(id);
-    setRemovingWatch(id);
-    setError("");
-    try {
-      await act({ operation: "stop", id });
-      setRows((current) =>
-        current.map((pr) => ({ ...pr, watches: pr.watches.filter((item) => item.id !== id) })),
-      );
-    } catch (failure) {
-      setError(failure instanceof Error ? failure.message : String(failure));
-    } finally {
-      stopping.current.delete(id);
-      setRemovingWatch(null);
-    }
+    await act({ operation: "stop", id });
+    setRows((current) =>
+      current.map((pr) => ({ ...pr, watches: pr.watches.filter((item) => item.id !== id) })),
+    );
   }
 
   function choose(pr: InboxPullRequest, operation: Selection["operation"]) {
@@ -136,6 +128,7 @@ export function PullRequestsScreen({ theme, layout, host, navigation }: PluginSc
   }
 
   const attention = rows.filter(needsAttention);
+  const managed = rows.find((pr) => pr.url === managedUrl);
 
   return (
     <>
@@ -153,35 +146,72 @@ export function PullRequestsScreen({ theme, layout, host, navigation }: PluginSc
         keyExtractor={(pr) => pr.url.toLowerCase()}
         ListHeaderComponent={
           <View style={{ gap: 8 }}>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 4 }}>
-              <InboxButton
-                {...buttons}
-                selected={onlyAttention}
-                onPress={() => setOnlyAttention(true)}
+            <View
+              style={{
+                flexDirection: layout.compact ? "column-reverse" : "row",
+                alignItems: layout.compact ? "stretch" : "center",
+                justifyContent: "space-between",
+                gap: 8,
+              }}
+            >
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
+                <InboxButton
+                  {...buttons}
+                  selected={onlyAttention}
+                  onPress={() => setOnlyAttention(true)}
+                >
+                  {rows.length
+                    ? `${t("prNeedsAttention")} (${attention.length})`
+                    : t("prNeedsAttention")}
+                </InboxButton>
+                <InboxButton
+                  {...buttons}
+                  selected={!onlyAttention}
+                  onPress={() => setOnlyAttention(false)}
+                >
+                  {rows.length ? `${t("all")} (${rows.length})` : t("all")}
+                </InboxButton>
+              </View>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  flexShrink: 1,
+                  gap: 8,
+                }}
               >
-                {rows.length
-                  ? `${t("prNeedsAttention")} (${attention.length})`
-                  : t("prNeedsAttention")}
-              </InboxButton>
-              <InboxButton
-                {...buttons}
-                selected={!onlyAttention}
-                onPress={() => setOnlyAttention(false)}
-              >
-                {rows.length ? `${t("all")} (${rows.length})` : t("all")}
-              </InboxButton>
-              <View style={{ marginLeft: "auto" }}>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 6,
+                    flexShrink: 1,
+                    borderRadius: 6,
+                    backgroundColor: theme.colors.surface2,
+                    paddingHorizontal: 8,
+                    paddingVertical: 5,
+                  }}
+                >
+                  <Icon name="Server" size={15} color={theme.colors.foregroundMuted} />
+                  <Text
+                    numberOfLines={1}
+                    accessibilityLabel={t("prHost", { host: host.label })}
+                    style={{ color: theme.colors.foreground, fontWeight: "600", flexShrink: 1 }}
+                  >
+                    {host.label}
+                  </Text>
+                </View>
                 <InboxButton
                   {...buttons}
                   icon="RefreshCw"
                   variant="outline"
                   label={t("refresh")}
-                  disabled={loading || removingWatch !== null}
+                  disabled={loading}
                   onPress={() => void refresh()}
                 />
               </View>
             </View>
-            <Text style={muted}>{t("prHost", { host: host.label })}</Text>
             {loading ? <Text style={muted}>{t("prLoading")}</Text> : null}
             {skipped.length > 0 ? (
               <Text style={muted}>{t("prSkipped", { workspaces: skipped.join(", ") })}</Text>
@@ -241,31 +271,6 @@ export function PullRequestsScreen({ theme, layout, host, navigation }: PluginSc
                   ? pr.issues.map((issue) => t(issueKeys[issue])).join(" · ")
                   : t(statusKeys[pr.status])}
               </Text>
-              {pr.watches.map((watch) => (
-                <View key={watch.id} style={{ gap: 2 }}>
-                  <View
-                    style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 4 }}
-                  >
-                    <WatchRecipient
-                      agentId={watch.agentId}
-                      status={t(watchKeys[watch.status])}
-                      color={theme.colors.foregroundMuted}
-                    />
-                    <InboxButton
-                      {...buttons}
-                      disabled={loading || removingWatch !== null}
-                      onPress={() => void stopWatch(watch.id)}
-                    >
-                      {t("prStopWatch")}
-                    </InboxButton>
-                  </View>
-                  {watch.lastError ? (
-                    <Text style={{ color: theme.colors.statusDanger, fontSize: 13 }}>
-                      {watch.lastError}
-                    </Text>
-                  ) : null}
-                </View>
-              ))}
               {fix ? (
                 <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap" }}>
                   <Text accessibilityLiveRegion="polite" style={muted}>
@@ -299,18 +304,30 @@ export function PullRequestsScreen({ theme, layout, host, navigation }: PluginSc
                     {t(fix ? "prFixAgain" : "prFix")}
                   </InboxButton>
                 ) : null}
-                {pr.targets.length > 0 && pr.status !== "closed" && pr.status !== "unavailable" ? (
+                {pr.watches.length > 0 ? (
                   <InboxButton
                     {...buttons}
                     variant="outline"
+                    icon={pr.watches.some(watchNeedsAttention) ? "CircleAlert" : "Bell"}
+                    danger={pr.watches.some(watchNeedsAttention)}
+                    disabled={loading}
+                    onPress={() => setManagedUrl(pr.url)}
+                  >
+                    {pr.watches.length > 1
+                      ? `${t("prWatching")} · ${pr.watches.length}`
+                      : pr.watches.some(watchNeedsAttention)
+                        ? t(watchKeys[pr.watches[0].status])
+                        : t("prWatching")}
+                  </InboxButton>
+                ) : canAddWatch(pr) ? (
+                  <InboxButton
+                    {...buttons}
+                    variant="outline"
+                    icon="Bell"
                     disabled={loading}
                     onPress={() => choose(pr, "watch")}
                   >
-                    {t(
-                      pr.watches.some((watch) => watch.status !== "closed")
-                        ? "prWatchAnother"
-                        : "prWatch",
-                    )}
+                    {t("prWatch")}
                   </InboxButton>
                 ) : null}
                 <InboxButton
@@ -328,6 +345,15 @@ export function PullRequestsScreen({ theme, layout, host, navigation }: PluginSc
           );
         }}
       />
+      {managed && !selection ? (
+        <WatchModal
+          {...buttons}
+          pr={managed}
+          onClose={() => setManagedUrl(null)}
+          onAdd={() => choose(managed, "watch")}
+          onStop={stopWatch}
+        />
+      ) : null}
       {selection ? (
         <RecipientModal
           selection={selection}
@@ -374,20 +400,136 @@ export function PullRequestsScreen({ theme, layout, host, navigation }: PluginSc
   );
 }
 
-function WatchRecipient({
-  agentId,
-  status,
-  color,
+function WatchModal({
+  pr,
+  theme,
+  compact,
+  onClose,
+  onAdd,
+  onStop,
 }: {
-  agentId: string;
-  status: string;
-  color: string;
+  pr: InboxPullRequest;
+  theme: PluginScreenProps["theme"];
+  compact: boolean;
+  onClose(): void;
+  onAdd(): void;
+  onStop(id: string): Promise<void>;
 }) {
-  const title = useAgent(agentId, (agent) => agent.title);
+  const { t } = useTranslation(messages);
+  const [error, setError] = useState("");
+  const [pending, setPending] = useState(false);
+  const inFlight = useRef(false);
+  async function stop(id: string) {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setPending(true);
+    setError("");
+    try {
+      await onStop(id);
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : String(failure));
+    } finally {
+      inFlight.current = false;
+      setPending(false);
+    }
+  }
   return (
-    <Text style={{ color, fontSize: 13 }}>
-      {status} · {title || agentId.slice(0, 8)}
-    </Text>
+    <Modal
+      title={t("prWatchSettings")}
+      open
+      onOpenChange={(open) => {
+        if (!open && !inFlight.current) onClose();
+      }}
+    >
+      <Modal.Content contentContainerStyle={{ padding: 16, gap: 10 }}>
+        <Text style={{ color: theme.colors.foreground, fontWeight: "600" }}>{pr.title}</Text>
+        {pr.watches.length === 0 ? (
+          <Text style={{ color: theme.colors.foregroundMuted }}>{t("prNoWatches")}</Text>
+        ) : null}
+        {pr.watches.map((watch) => (
+          <WatchRow
+            key={watch.id}
+            watch={watch}
+            theme={theme}
+            compact={compact}
+            pending={pending}
+            onStop={() => void stop(watch.id)}
+          />
+        ))}
+        {error ? (
+          <Text accessibilityRole="alert" style={{ color: theme.colors.statusDanger }}>
+            {error}
+          </Text>
+        ) : null}
+        {canAddWatch(pr) ? (
+          <InboxButton
+            theme={theme}
+            compact={compact}
+            variant="outline"
+            icon="Plus"
+            disabled={pending}
+            onPress={onAdd}
+          >
+            {t(pr.watches.length ? "prWatchAnother" : "prWatch")}
+          </InboxButton>
+        ) : null}
+      </Modal.Content>
+    </Modal>
+  );
+}
+
+function WatchRow({
+  watch,
+  theme,
+  compact,
+  pending,
+  onStop,
+}: {
+  watch: InboxPullRequest["watches"][number];
+  theme: PluginScreenProps["theme"];
+  compact: boolean;
+  pending: boolean;
+  onStop(): void;
+}) {
+  const { t } = useTranslation(messages);
+  const title = useAgent(watch.agentId, (agent) => agent.title) || watch.agentId.slice(0, 8);
+  return (
+    <View style={{ gap: 3 }}>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
+        }}
+      >
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: theme.colors.foreground }}>{title}</Text>
+          <Text
+            style={{
+              color: watchNeedsAttention(watch)
+                ? theme.colors.statusDanger
+                : theme.colors.foregroundMuted,
+              fontSize: 13,
+            }}
+          >
+            {t(watchKeys[watch.status])}
+          </Text>
+        </View>
+        <InboxButton
+          theme={theme}
+          compact={compact}
+          label={t("prStopWatchFor", { agent: title })}
+          disabled={pending}
+          onPress={onStop}
+        >
+          {t("prStopWatch")}
+        </InboxButton>
+      </View>
+      {watch.lastError ? (
+        <Text style={{ color: theme.colors.statusDanger, fontSize: 13 }}>{watch.lastError}</Text>
+      ) : null}
+    </View>
   );
 }
 

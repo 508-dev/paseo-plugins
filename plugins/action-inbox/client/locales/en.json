@@ -121,5 +121,8 @@
   "prNoIdleAgents": "Wait for an agent to become idle before sending a fix request.",
   "prAgentUnavailable": "Unavailable",
   "prHost": "On {{host}}",
-  "prWatchAnother": "Watch with another agent"
+  "prWatchAnother": "Watch with another agent",
+  "prWatchSettings": "Manage watches",
+  "prNoWatches": "No agents are watching this PR.",
+  "prStopWatchFor": "Stop watch for {{agent}}"
 }

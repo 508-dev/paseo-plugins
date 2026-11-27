@@ -116,5 +116,8 @@
   "prNoIdleAgents": "请等到有空闲的代理后再发送修复请求。",
   "prAgentUnavailable": "不可用",
   "prHost": "主机：{{host}}",
-  "prWatchAnother": "使用其他代理关注"
+  "prWatchAnother": "使用其他代理关注",
+  "prWatchSettings": "管理关注",
+  "prNoWatches": "没有代理正在关注此拉取请求。",
+  "prStopWatchFor": "停止 {{agent}} 的关注"
 }
