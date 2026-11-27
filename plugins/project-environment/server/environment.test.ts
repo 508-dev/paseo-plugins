@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { createServer } from "node:http";
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -30,7 +30,7 @@ afterEach(async () => {
   cleanup.length = 0;
 });
 async function fixture() {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-environment-"));
+  const directory = await mkdtemp(path.join(await realpath(tmpdir()), "paseo-environment-"));
   cleanup.push(() => rm(directory, { recursive: true, force: true }));
   const scope = await projectScope(directory);
   const store = new EnvironmentStore(path.join(directory, "data"));

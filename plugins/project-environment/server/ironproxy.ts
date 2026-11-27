@@ -12,13 +12,20 @@ import { proxyRoute } from "../shared/environment";
 import { redact } from "./execute";
 
 const binary = path.join(homedir(), ".local/lib/paseo-project-environment/iron-proxy-v0.61.0");
-const sha = "c223d05522bba90dc30490964e90d0d43029d55f1f1d4a0d23ca29dd39d54c4e";
-export const installHint =
-  "Install the approved IronProxy v0.61.0 Linux AMD64 binary on the Paseo host at " + binary;
+const binaryDigests: Readonly<Record<string, string | undefined>> = {
+  linux_amd64: "c223d05522bba90dc30490964e90d0d43029d55f1f1d4a0d23ca29dd39d54c4e",
+  darwin_amd64: "232d15a54ee485f4c194acc2efe2f93e196e208f0c3e82c435253c9b714d5e87",
+  darwin_arm64: "775df584c40958464b067cd36ddabbd919a345dec68356632ce43f5dd5267ea8",
+};
+
 export class ProxySetupError extends Error {}
 export async function verifyProxy() {
-  if (process.platform !== "linux" || process.arch !== "x64")
-    throw new ProxySetupError("IronProxy mode requires a Linux AMD64 host.");
+  const target = `${process.platform}_${process.arch === "x64" ? "amd64" : process.arch}`;
+  const sha = binaryDigests[target];
+  if (!sha)
+    throw new ProxySetupError(
+      `Unsupported IronProxy host: ${process.platform}/${process.arch}. Supported hosts are macOS (Apple Silicon or Intel) and Linux AMD64.`,
+    );
   try {
     await access(binary, constants.X_OK);
     if (
@@ -30,7 +37,9 @@ export async function verifyProxy() {
   } catch {
     /* Missing or unreadable executable. */
   }
-  throw new ProxySetupError(installHint);
+  throw new ProxySetupError(
+    `Extract iron-proxy_0.61.0_${target}.tar.gz from the IronProxy v0.61.0 release and install the executable at ${binary}.`,
+  );
 }
 
 async function freePort(): Promise<number> {
@@ -161,10 +170,26 @@ export async function proxyRequest(
       { mode: 0o600 },
     );
     const ca = await readFile(cert);
-    // Bound the subprocess lifetime even if the plugin itself exits abruptly.
-    const child = spawn("/usr/bin/timeout", ["-k", "1", "35", binary, "--config", config], {
+    // macOS has no system timeout command. Its shell watches a pipe owned by
+    // the plugin: EOF (including a daemon crash) or the deadline stops the proxy.
+    const darwin = process.platform === "darwin";
+    const launcher = darwin ? "/bin/bash" : "/usr/bin/timeout";
+    const args = darwin
+      ? [
+          "-c",
+          `
+          "$@" </dev/null &
+          proxy=$!
+          trap 'kill -KILL "$proxy" 2>/dev/null; wait "$proxy" 2>/dev/null' EXIT
+          trap 'exit 1' CHLD
+          read -r -t 35
+        `,
+          "ironproxy-watchdog",
+        ]
+      : ["-k", "1", "35"];
+    const child = spawn(launcher, [...args, binary, "--config", config], {
       env: { UPSTREAM_CREDENTIAL: value },
-      stdio: "ignore",
+      stdio: [darwin ? "pipe" : "ignore", "ignore", "ignore"],
     });
     const closed = new Promise<void>((resolve) => child.once("close", () => resolve()));
     let failed = false;
@@ -185,7 +210,8 @@ export async function proxyRequest(
         }
       }
     } finally {
-      child.kill();
+      if (child.stdin) child.stdin.end();
+      else child.kill();
       await closed;
     }
   } finally {

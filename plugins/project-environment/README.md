@@ -116,4 +116,12 @@ In **Protected settings → Add request**, give an operation a name, choose GET,
 
 The plugin rejects raw reveal, clipboard reads and shell injection for a proxy credential. An owner can explicitly restore shell access in **Protected settings**. This controls plugin access. Values are still stored in owner-only files, and processes with unrestricted access to the host account can read them.
 
-The host-wide Variables screen shows whether the IronProxy binary is verified. Linux AMD64 hosts require the [IronProxy v0.61.0 release](https://github.com/paradigmxyz/iron-proxy/releases/tag/v0.61.0). Verify the Linux AMD64 archive SHA-256 `30820ba357b19a41ca6eda77caf7c7105cbd0444343d804711c57b8ae7a3c6a9`, extract the binary, and install it executable at `~/.local/lib/paseo-project-environment/iron-proxy-v0.61.0` for the daemon account. The plugin checks the pinned binary digest before use, starts a temporary loopback proxy for each request and stops it afterward. It does not follow redirects or accept agent-specified hosts, headers or paths.
+The host-wide Variables screen shows whether the IronProxy binary is verified. Download the archive for the Paseo daemon from the [IronProxy v0.61.0 release](https://github.com/paradigmxyz/iron-proxy/releases/tag/v0.61.0).
+
+| Host                | Archive                                 | SHA-256                                                            |
+| ------------------- | --------------------------------------- | ------------------------------------------------------------------ |
+| macOS Apple Silicon | `iron-proxy_0.61.0_darwin_arm64.tar.gz` | `ea31caae6200b2dd10aa496b095e6ffe9255ba461cc0663b1cb799c6c3bddcd5` |
+| macOS Intel         | `iron-proxy_0.61.0_darwin_amd64.tar.gz` | `861d1b4a629ae40a8b83c82755cabb098867c2bde671f782598400e016f77f24` |
+| Linux AMD64         | `iron-proxy_0.61.0_linux_amd64.tar.gz`  | `30820ba357b19a41ca6eda77caf7c7105cbd0444343d804711c57b8ae7a3c6a9` |
+
+Verify the archive checksum (on macOS, run `shasum -a 256 <archive>`), extract `iron-proxy`, and install it executable at `~/.local/lib/paseo-project-environment/iron-proxy-v0.61.0` for the daemon account. The plugin checks the pinned binary digest before use, starts a temporary loopback proxy for each request and stops it afterward. It does not follow redirects or accept agent-specified hosts, headers or paths.
