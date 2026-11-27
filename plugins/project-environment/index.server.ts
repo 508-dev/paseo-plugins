@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import path from "node:path";
 import {
   configureProxy,
+  proposedRequests,
   proxyStatus,
   listVariables,
   saveVariable,
@@ -132,15 +133,17 @@ export default function contribute(server: PluginServerContext) {
     ]);
     return {
       scopeId: project.id,
-      variables: variables.map(({ name, description, proxyUrl }) => ({
+      variables: variables.map(({ name, description, proxyUrl, requests }) => ({
         name,
         description,
         proxyUrl,
+        requests,
       })),
-      workspaceVariables: workspaceVariables.map(({ name, description, proxyUrl }) => ({
+      workspaceVariables: workspaceVariables.map(({ name, description, proxyUrl, requests }) => ({
         name,
         description,
         proxyUrl,
+        requests,
       })),
     };
   });
@@ -153,18 +156,27 @@ export default function contribute(server: PluginServerContext) {
       return { ready: false, detail: error.message } as const;
     }
   });
-  server.handle(configureProxy, async ({ workspaceId, scope, name, expected, url }, { paseo }) => {
-    await start();
-    if (url) await verifyProxy();
+  server.handle(proposedRequests, async ({ workspaceId, scope, name }, { paseo }) => {
     const project = await resolveProject(paseo, workspaceId);
-    await broker.store.configureProxy(
-      scope === "workspace" ? await workspaceScope(project) : project,
-      name,
-      expected,
-      url,
-    );
-    return {};
+    return { requests: broker.proposals(project.cwd, scope, name) };
   });
+  server.handle(
+    configureProxy,
+    async ({ workspaceId, scope, name, expected, url, previousRequests, requests }, { paseo }) => {
+      await start();
+      if (url) await verifyProxy();
+      const project = await resolveProject(paseo, workspaceId);
+      await broker.store.configureProxy(
+        scope === "workspace" ? await workspaceScope(project) : project,
+        name,
+        expected,
+        url,
+        previousRequests,
+        requests,
+      );
+      return {};
+    },
+  );
   server.handle(saveVariable, async ({ workspaceId, scope, variable }, { paseo }) => {
     await start();
     const project = await resolveProject(paseo, workspaceId);

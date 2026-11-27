@@ -299,6 +299,7 @@ test("the same MCP client uses an updated API key without reopening its agent", 
     "project_environment_list",
     "project_environment_run",
     "project_environment_request",
+    "project_environment_propose_request",
   ]);
   const command = node(
     `fetch('http://127.0.0.1:${address.port}', { headers: { Authorization: 'Bearer ' + process.env.API_KEY } }).then(r => r.text()).then(console.log)`,
@@ -715,4 +716,34 @@ test("proxy routing survives rotations and refuses raw reads and shell injection
   ).rejects.toThrow("project_environment_request");
   await store.configureProxy(scope, v.name, url, null);
   expect(await store.readValue(scope, v.name)).toBe("rotated");
+});
+
+test("an agent suggestion stays unauthorized until the owner saves the exact operation", async () => {
+  const { scope, directory } = await fixture();
+  const broker = new EnvironmentBroker(path.join(directory, "broker"));
+  await broker.start();
+  cleanup.push(() => broker.close());
+  const client = new Client({ name: "proposal-test", version: "1" });
+  await client.connect(new StreamableHTTPClientTransport(new URL(await broker.endpoint(scope))));
+  cleanup.push(() => client.close());
+  const name = "TEST_TOKEN",
+    url = "https://example.com/account";
+  await broker.store.save(scope, { name, description: "fixture", value: "fixture", proxyUrl: url });
+  const request = { id: "update", method: "PATCH" as const, url };
+  await client.callTool({
+    name: "project_environment_propose_request",
+    arguments: { name, request },
+  });
+  expect(broker.proposals(scope.cwd, "project", name)).toEqual([request]);
+  const call = {
+    name: "project_environment_request",
+    arguments: { name, operation: "update", body: "{}" },
+  };
+  expect((await client.callTool(call)).isError).toBe(true);
+  await broker.store.configureProxy(scope, name, url, url, [], [request]);
+  expect(
+    toolText(await client.callTool({ name: "project_environment_list", arguments: {} })),
+  ).toContain("PATCH");
+  await broker.store.configureProxy(scope, name, url, url, [request], []);
+  expect((await client.callTool(call)).isError).toBe(true);
 });

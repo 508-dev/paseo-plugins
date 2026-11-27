@@ -3,19 +3,34 @@ import { messages } from "./messages";
 import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
 import { Text, View } from "react-native";
 import type { PluginTheme } from "@getpaseo/plugin";
+import { AllowedRequests } from "./allowed-requests";
 import { ActionButton } from "./action-button";
 import { ProxyRouteField } from "./proxy-route-field";
 import { Field } from "./field";
 import { SavedVariableEditor } from "./saved-variable-editor";
 import { ValueControls } from "./value";
-import { proxyRoute, type variableInput, type VariableTarget } from "../shared/environment";
+import {
+  proxyRoute,
+  type AllowedRequest,
+  type variableInput,
+  type VariableTarget,
+} from "../shared/environment";
 import type { z } from "zod";
 
 interface VariableCardProps {
   target: VariableTarget;
   hostId: string;
+  workspaceId: string;
+  scope: "workspace" | "project";
+  requests?: AllowedRequest[];
   proxyUrl?: string;
-  setRoute(name: string, expected: string | null, url: string | null): Promise<void>;
+  setRoute(
+    name: string,
+    expected: string | null,
+    url: string | null,
+    previousRequests: AllowedRequest[],
+    requests: AllowedRequest[],
+  ): Promise<void>;
   name: string;
   description: string;
   theme: PluginTheme;
@@ -25,6 +40,9 @@ interface VariableCardProps {
 export function VariableCard({
   target,
   hostId,
+  workspaceId,
+  scope,
+  requests,
   proxyUrl,
   setRoute,
   name,
@@ -35,6 +53,7 @@ export function VariableCard({
 }: VariableCardProps) {
   const { t } = useTranslation(messages);
   const [routing, setRouting] = useState(false);
+  const [items, setItems] = useState(requests ?? []);
   const [route, setUrl] = useState(proxyUrl ?? "");
   const [busy, setBusy] = useState(false);
   const [routeError, setRouteError] = useState("");
@@ -43,7 +62,7 @@ export function VariableCard({
       setBusy(true);
       setRouteError("");
       try {
-        await setRoute(name, proxyUrl ?? null, url);
+        await setRoute(name, proxyUrl ?? null, url, requests ?? [], items);
         setRouting(false);
       } catch {
         setRouteError(
@@ -53,11 +72,16 @@ export function VariableCard({
         setBusy(false);
       }
     },
-    [name, proxyUrl, setRoute],
+    [name, proxyUrl, setRoute, requests, items],
   );
   const saveRoute = useCallback(() => void apply(route), [apply, route]);
   const clearRoute = useCallback(() => void apply(null), [apply]);
-  const toggleRouting = useCallback(() => setRouting((open) => !open), []);
+  const toggleRouting = useCallback(() => {
+    setItems(requests ?? []);
+    setUrl(proxyUrl ?? "");
+    setRouteError("");
+    setRouting((open) => !open);
+  }, [requests, proxyUrl]);
   const closeRouting = useCallback(() => setRouting(false), []);
   const [editor] = useState(() => new SavedVariableEditor(name, { save, remove }));
   const state = useSyncExternalStore(editor.subscribe, editor.getState);
@@ -131,8 +155,13 @@ export function VariableCard({
       {routing && state.mode === "view" && (
         <View style={styles.confirmation}>
           <ProxyRouteField value={route} onChangeText={setUrl} disabled={busy} theme={theme} />
+          <AllowedRequests
+            {...{ theme, workspaceId, scope, hostId, name, items, setItems }}
+            base={route}
+            disabled={busy}
+          />
           <ActionButton
-            label="Save protected route"
+            label="Save allowed requests"
             onPress={saveRoute}
             disabled={busy || !proxyRoute.safeParse(route).success}
             theme={theme}

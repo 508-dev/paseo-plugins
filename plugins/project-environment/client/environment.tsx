@@ -11,6 +11,7 @@ import { ScrollView } from "@getpaseo/plugin/client/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { z } from "zod";
 import {
+  type AllowedRequest,
   configureProxy,
   proxyRoute,
   listVariables,
@@ -84,8 +85,22 @@ function ScopedEnvironment({
     ]);
   }, [queryClient]);
   const setRoute = useCallback(
-    async (name: string, expected: string | null, endpoint: string | null) => {
-      await configure({ workspaceId, scope, name, expected, url: endpoint });
+    async (
+      name: string,
+      expected: string | null,
+      endpoint: string | null,
+      previousRequests: AllowedRequest[],
+      requests: AllowedRequest[],
+    ) => {
+      await configure({
+        workspaceId,
+        scope,
+        name,
+        expected,
+        url: endpoint,
+        previousRequests,
+        requests,
+      });
       await invalidate();
     },
     [configure, workspaceId, scope, invalidate],
@@ -223,7 +238,10 @@ function ScopedEnvironment({
         {target &&
           savedVariables?.map((variable) => (
             <VariableCard
-              key={JSON.stringify([variable.name, variable.proxyUrl])}
+              key={JSON.stringify([variable.name, variable.proxyUrl, variable.requests])}
+              workspaceId={workspaceId}
+              scope={scope}
+              requests={variable.requests}
               proxyUrl={variable.proxyUrl}
               setRoute={setRoute}
               target={target}

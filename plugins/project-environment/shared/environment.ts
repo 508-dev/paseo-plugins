@@ -27,10 +27,27 @@ export const proxyRoute = z
       return false;
     }
   }, "Use an exact HTTPS URL without query parameters.");
+export const requestMethod = z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]);
+export const allowedRequest = z
+  .object({
+    id: z
+      .string()
+      .regex(/^[a-z][a-z0-9_-]{0,63}$/)
+      .refine((id) => id !== "default"),
+    method: requestMethod,
+    url: proxyRoute,
+  })
+  .strict();
+export type AllowedRequest = z.infer<typeof allowedRequest>;
+export const requestList = z
+  .array(allowedRequest)
+  .max(32)
+  .refine((items) => new Set(items.map((i) => i.id)).size === items.length);
 export const variableMetadata = z.object({
   name: variableName,
   description: z.string().max(500),
   proxyUrl: proxyRoute.optional(),
+  requests: requestList.optional(),
 });
 export const variableInput = variableMetadata.extend({
   value: z
@@ -42,6 +59,11 @@ export const variableInput = variableMetadata.extend({
 const workspaceInput = z.object({ workspaceId: z.string().min(1) });
 const editScope = workspaceInput.extend({
   scope: z.enum(["project", "workspace"]).default("project"),
+});
+export const proposedRequests = defineRpc({
+  name: "environment.proposed-requests",
+  input: editScope.extend({ name: variableName }),
+  output: z.object({ requests: requestList }),
 });
 export const proxyStatus = defineRpc({
   name: "environment.proxy-status",
@@ -56,6 +78,8 @@ export const configureProxy = defineRpc({
   input: editScope.extend({
     name: variableName,
     expected: proxyRoute.nullable(),
+    previousRequests: requestList.default([]),
+    requests: requestList.default([]),
     url: proxyRoute.nullable(),
   }),
   output: z.object({}),

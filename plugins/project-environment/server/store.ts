@@ -227,11 +227,18 @@ export class EnvironmentStore {
     name: string,
     expected: string | null,
     url: string | null,
+    previousRequests: NonNullable<Variable["requests"]> = [],
+    requests: NonNullable<Variable["requests"]> = [],
   ) {
     return this.change(scope, (variables) => {
       const entry = variables.find((v) => v.name === name);
-      if (!entry || (entry.proxyUrl ?? null) !== expected)
+      if (
+        !entry ||
+        (entry.proxyUrl ?? null) !== expected ||
+        JSON.stringify(entry.requests ?? []) !== JSON.stringify(previousRequests)
+      )
         throw new Error("Credential changed. Refresh and retry.");
+      entry.requests = url && requests.length ? requests : undefined;
       entry.proxyUrl = url ?? undefined;
       return variables;
     });

@@ -47,7 +47,15 @@ async function freePort(): Promise<number> {
   });
 }
 
-function get(port: number, url: URL, ca: Buffer, token: string, signal: AbortSignal) {
+function sendRequest(
+  port: number,
+  url: URL,
+  ca: Buffer,
+  token: string,
+  signal: AbortSignal,
+  method: string,
+  body?: string,
+) {
   return new Promise<{ status: number; body: string }>((resolve, reject) => {
     const req = request(
       {
@@ -55,8 +63,15 @@ function get(port: number, url: URL, ca: Buffer, token: string, signal: AbortSig
         port,
         ca,
         servername: url.hostname,
+        method,
         path: url.pathname,
-        headers: { Host: url.hostname, Authorization: "Bearer " + token },
+        headers: {
+          Host: url.hostname,
+          Authorization: "Bearer " + token,
+          ...(body !== undefined
+            ? { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) }
+            : {}),
+        },
         agent: false,
         signal,
       },
@@ -75,15 +90,17 @@ function get(port: number, url: URL, ca: Buffer, token: string, signal: AbortSig
       },
     );
     req.on("error", reject);
-    req.end();
+    req.end(body);
   });
 }
 
-export async function proxyGet(
+export async function proxyRequest(
   route: string,
   value: string,
   secrets: string[],
   canceled: AbortSignal,
+  method = "GET",
+  body?: string,
 ) {
   const url = new URL(proxyRoute.parse(route));
   await verifyProxy();
@@ -97,7 +114,7 @@ export async function proxyGet(
     );
     const token = randomBytes(32).toString("hex");
     const port = await freePort();
-    const rule = { host: url.hostname, methods: ["GET"], paths: [url.pathname] };
+    const rule = { host: url.hostname, methods: [method], paths: [url.pathname] };
     const cert = path.join(dir, "ca.crt");
     const config = path.join(dir, "policy.json");
     await writeFile(
@@ -159,7 +176,7 @@ export async function proxyGet(
         if (failed || child.exitCode !== null || child.signalCode !== null)
           throw new Error("Proxy startup failed");
         try {
-          const result = await get(port, url, ca, token, signal);
+          const result = await sendRequest(port, url, ca, token, signal, method, body);
           return { status: result.status, body: redact(result.body, [...secrets, token]) };
         } catch (error) {
           if (!(error instanceof Error && "code" in error && error.code === "ECONNREFUSED"))
