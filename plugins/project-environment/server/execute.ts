@@ -46,6 +46,8 @@ export function redact(text: string, secrets: string[]): string {
   return result;
 }
 
+export class ProxyOnlyError extends Error {}
+
 export async function execute(options: ExecutionOptions): Promise<ExecutionResult> {
   const input = executionInput.parse(options.input);
   if (options.signal?.aborted) throw new Error("Environment command canceled");
@@ -58,6 +60,10 @@ export async function execute(options: ExecutionOptions): Promise<ExecutionResul
     const variable = variables.find((entry) => entry.name === name);
     if (!variable)
       throw new Error(`Variable ${name} is unavailable. List available variables first.`);
+    if (variable.proxyUrl)
+      throw new ProxyOnlyError(
+        "Use project_environment_request for " + name + ". Shell injection is disabled.",
+      );
     env[name] = variable.value;
   }
   return new Promise((resolve, reject) => {

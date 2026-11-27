@@ -5,7 +5,33 @@ export const variableName = z
   .string()
   .regex(/^[A-Z_][A-Z0-9_]*$/)
   .max(128);
-export const variableMetadata = z.object({ name: variableName, description: z.string().max(500) });
+// Exact public HTTPS endpoint, with no userinfo, port, query, fragment or wildcard.
+export const proxyRoute = z
+  .string()
+  .max(2048)
+  .refine((text) => {
+    try {
+      const url = new URL(text);
+      return (
+        url.href === text &&
+        url.protocol === "https:" &&
+        !url.port &&
+        !url.username &&
+        !url.password &&
+        !url.search &&
+        !url.hash &&
+        /^[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}$/.test(url.hostname) &&
+        /^\/[A-Za-z0-9_./~-]*$/.test(url.pathname)
+      );
+    } catch {
+      return false;
+    }
+  }, "Use an exact HTTPS URL without query parameters.");
+export const variableMetadata = z.object({
+  name: variableName,
+  description: z.string().max(500),
+  proxyUrl: proxyRoute.optional(),
+});
 export const variableInput = variableMetadata.extend({
   value: z
     .string()
@@ -16,6 +42,15 @@ export const variableInput = variableMetadata.extend({
 const workspaceInput = z.object({ workspaceId: z.string().min(1) });
 const editScope = workspaceInput.extend({
   scope: z.enum(["project", "workspace"]).default("project"),
+});
+export const configureProxy = defineRpc({
+  name: "environment.configure-proxy",
+  input: editScope.extend({
+    name: variableName,
+    expected: proxyRoute.nullable(),
+    url: proxyRoute.nullable(),
+  }),
+  output: z.object({}),
 });
 export const scopeId = z.string().regex(/^[a-f0-9]{64}$/);
 export const listVariables = defineRpc({

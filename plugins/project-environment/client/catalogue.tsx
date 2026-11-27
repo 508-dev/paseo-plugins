@@ -60,7 +60,7 @@ function WorkspaceResults({ workspace, openEditor, theme, hostId }: WorkspaceRes
       </View>
       {workspace.variables.map((variable) => (
         <VariableResult
-          key={variable.name}
+          key={JSON.stringify([variable.name, variable.proxyUrl])}
           {...variable}
           target={target}
           hostId={hostId}
@@ -93,7 +93,7 @@ function ProjectResults({ project, theme, openEditor, hostId }: ProjectResultsPr
       {project.variables.length ? <Text style={styles.detail}>{t("projectDefaults")}</Text> : null}
       {project.variables.map((variable) => (
         <VariableResult
-          key={variable.name}
+          key={JSON.stringify([variable.name, variable.proxyUrl])}
           {...variable}
           target={target}
           hostId={hostId}
@@ -119,6 +119,7 @@ function ProjectResults({ project, theme, openEditor, hostId }: ProjectResultsPr
 function VariableResult({
   name,
   description,
+  proxyUrl,
   target,
   hostId,
   theme,
@@ -147,6 +148,7 @@ function VariableResult({
         hostId={hostId}
         name={name}
         description={description}
+        proxyUrl={proxyUrl}
         theme={theme}
       />
     </View>

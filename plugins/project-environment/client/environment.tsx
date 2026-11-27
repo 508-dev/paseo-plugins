@@ -11,6 +11,8 @@ import { ScrollView } from "@getpaseo/plugin/client/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { z } from "zod";
 import {
+  configureProxy,
+  proxyRoute,
   listVariables,
   saveVariable,
   removeVariable,
@@ -59,6 +61,10 @@ function ScopedEnvironment({
   const project = useWorkspace(workspaceId, (workspace) => workspace.projectDisplayName);
   const workspaceName = useWorkspace(workspaceId, (workspace) => workspace.name);
   const isProject = scope === "project";
+  const [useProxy, setUseProxy] = useState(false);
+  const toggleProxy = useCallback(() => setUseProxy((active) => !active), []);
+  const [url, setUrl] = useState("");
+  const configure = useRpc(configureProxy);
   const list = useRpc(listVariables);
   const save = useRpc(saveVariable);
   const remove = useRpc(removeVariable);
@@ -76,6 +82,13 @@ function ScopedEnvironment({
       queryClient.invalidateQueries({ queryKey: ["project-environment-catalogue"] }),
     ]);
   }, [queryClient]);
+  const setRoute = useCallback(
+    async (name: string, expected: string | null, endpoint: string | null) => {
+      await configure({ workspaceId, scope, name, expected, url: endpoint });
+      await invalidate();
+    },
+    [configure, workspaceId, scope, invalidate],
+  );
   const [bulk, setBulk] = useState(false);
   const openBulk = useCallback(() => {
     setNotice(null);
@@ -154,8 +167,8 @@ function ScopedEnvironment({
   }, [data, isProject, workspaceId]);
   const submit = useCallback(() => {
     const existingNames = savedVariables?.map((variable) => variable.name) ?? [];
-    void editor.save(existingNames);
-  }, [editor, savedVariables]);
+    void editor.save(existingNames, useProxy ? url : undefined);
+  }, [editor, savedVariables, useProxy, url]);
   let messageStyle = styles.detail;
   if (form.status === "error") messageStyle = styles.error;
   if (form.status === "saved") messageStyle = styles.success;
@@ -209,7 +222,9 @@ function ScopedEnvironment({
         {target &&
           savedVariables?.map((variable) => (
             <VariableCard
-              key={variable.name}
+              key={JSON.stringify([variable.name, variable.proxyUrl])}
+              proxyUrl={variable.proxyUrl}
+              setRoute={setRoute}
               target={target}
               hostId={host.id}
               name={variable.name}
@@ -258,13 +273,40 @@ function ScopedEnvironment({
               theme={theme}
               disabled={pending}
             />
+            <ActionButton
+              label={useProxy ? "Use through IronProxy ✓" : "Use through IronProxy"}
+              selected={useProxy}
+              disabled={pending}
+              theme={theme}
+              onPress={toggleProxy}
+            />
+            {useProxy && (
+              <>
+                <Field
+                  label="Approved HTTPS GET endpoint"
+                  theme={theme}
+                  value={url}
+                  onChangeText={setUrl}
+                  disabled={pending}
+                  placeholder="https://api.example.com/v1/account"
+                />
+                <Text style={styles.detail}>
+                  IronProxy supplies the bearer token. Shell injection and value reveal are
+                  disabled. Install IronProxy v0.61.0 on the Paseo host before saving.
+                </Text>
+              </>
+            )}
             <View style={styles.actions}>
               <ActionButton
                 label={pending ? t("adding") : t("addVariable")}
                 onPress={submit}
                 theme={theme}
                 variant="primary"
-                disabled={pending || !variables.isSuccess}
+                disabled={
+                  pending ||
+                  !variables.isSuccess ||
+                  (useProxy && !proxyRoute.safeParse(url).success)
+                }
               />
               <ActionButton
                 label={t("pasteVariables")}

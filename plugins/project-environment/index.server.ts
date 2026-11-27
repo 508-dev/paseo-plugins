@@ -2,6 +2,7 @@ import type { PluginHandlerContext, PluginServerContext } from "@getpaseo/plugin
 import { homedir } from "node:os";
 import path from "node:path";
 import {
+  configureProxy,
   listVariables,
   saveVariable,
   addVariables,
@@ -12,6 +13,7 @@ import {
   copyVariable,
   type VariableTarget,
 } from "./shared/environment";
+import { verifyProxy } from "./server/ironproxy";
 import { parseBulkVariables } from "./shared/bulk-paste";
 import { EnvironmentBroker, toolInstructions } from "./server/broker";
 import { buildVariableCatalogue, readWorkspaceDirectory } from "./server/catalogue";
@@ -129,16 +131,34 @@ export default function contribute(server: PluginServerContext) {
     ]);
     return {
       scopeId: project.id,
-      variables: variables.map(({ name, description }) => ({ name, description })),
-      workspaceVariables: workspaceVariables.map(({ name, description }) => ({
+      variables: variables.map(({ name, description, proxyUrl }) => ({
         name,
         description,
+        proxyUrl,
+      })),
+      workspaceVariables: workspaceVariables.map(({ name, description, proxyUrl }) => ({
+        name,
+        description,
+        proxyUrl,
       })),
     };
+  });
+  server.handle(configureProxy, async ({ workspaceId, scope, name, expected, url }, { paseo }) => {
+    await start();
+    if (url) await verifyProxy();
+    const project = await resolveProject(paseo, workspaceId);
+    await broker.store.configureProxy(
+      scope === "workspace" ? await workspaceScope(project) : project,
+      name,
+      expected,
+      url,
+    );
+    return {};
   });
   server.handle(saveVariable, async ({ workspaceId, scope, variable }, { paseo }) => {
     await start();
     const project = await resolveProject(paseo, workspaceId);
+    if (variable.proxyUrl) await verifyProxy();
     await broker.store.save(
       scope === "workspace" ? await workspaceScope(project) : project,
       variable,

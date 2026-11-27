@@ -19,6 +19,7 @@ import { VariableValueController } from "./value-controller";
 interface ValueControlsProps {
   target: VariableTarget;
   hostId: string;
+  proxyUrl?: string;
   name: string;
   description: string;
   theme: PluginTheme;
@@ -27,6 +28,7 @@ interface ValueControlsProps {
 export function ValueControls({
   target,
   hostId,
+  proxyUrl,
   name,
   description,
   theme,
@@ -99,23 +101,28 @@ export function ValueControls({
         <Text selectable style={styles.title}>
           {name}
         </Text>
-        <ActionButton
-          label={t(revealed ? "hideValueFor" : "revealValueFor", { name })}
-          icon={revealed ? "EyeOff" : "Eye"}
-          disabled={busy}
-          onPress={reveal}
-          theme={theme}
-        />
-        <ActionButton
-          label={t("copyValueFor", { name })}
-          icon="Clipboard"
-          disabled={busy}
-          onPress={copy}
-          theme={theme}
-        />
+        {!proxyUrl && (
+          <>
+            <ActionButton
+              label={t(revealed ? "hideValueFor" : "revealValueFor", { name })}
+              icon={revealed ? "EyeOff" : "Eye"}
+              disabled={busy}
+              onPress={reveal}
+              theme={theme}
+            />
+            <ActionButton
+              label={t("copyValueFor", { name })}
+              icon="Clipboard"
+              disabled={busy}
+              onPress={copy}
+              theme={theme}
+            />
+          </>
+        )}
       </View>
+      {proxyUrl && <Text style={styles.detail}>IronProxy · GET {proxyUrl}</Text>}
       {description ? <Text style={styles.detail}>{description}</Text> : null}
-      {state.revealed !== null ? (
+      {!proxyUrl && state.revealed !== null ? (
         <Text selectable style={styles.value}>
           {state.revealed}
         </Text>

@@ -4,8 +4,11 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import path from "node:path";
 import { z } from "zod";
-import { execute, executionInput } from "./execute";
+import { execute, executionInput, ProxyOnlyError } from "./execute";
 import { EnvironmentStore, privateWrite, readJson, type ProjectScope } from "./store";
+
+import { proxyGet, ProxySetupError } from "./ironproxy";
+import { variableName } from "../shared/environment";
 
 const brokerState = z.object({
   port: z.number().int().min(1).max(65535),
@@ -20,7 +23,7 @@ const brokerState = z.object({
 });
 type BrokerState = z.infer<typeof brokerState>;
 export const toolInstructions =
-  "Use project_environment_list to discover available variable names and descriptions. For commands needing these variables, use project_environment_run and request only the variable names needed. Reference values through environment variables in code; never put values in tool arguments, source files, chat, or logs. Do not print or encode credentials. Commands have host filesystem/network access and can perform actions allowed by the credentials. Values are read fresh on every execution.";
+  "Use project_environment_list to discover available variable names and descriptions. For credentials marked IronProxy, use project_environment_request with the name. For commands needing ordinary variables, use project_environment_run and request only the variable names needed. Reference values through environment variables in code; never put values in tool arguments, source files, chat, or logs. Do not print or encode credentials. Commands have host filesystem/network access and can perform actions allowed by the credentials. Values are read fresh on every execution.";
 
 export class EnvironmentBroker {
   private server: Server | null = null;
@@ -80,7 +83,19 @@ export class EnvironmentBroker {
         },
         async () => {
           const { variables } = await this.store.readEffective(binding.scope);
-          const metadata = variables.map(({ name, description }) => ({ name, description }));
+          const metadata = variables.map(({ name, description, proxyUrl }) =>
+            proxyUrl
+              ? {
+                  name,
+                  description,
+                  mode: "ironproxy",
+                  method: "GET",
+                  url: proxyUrl,
+                  usage:
+                    "Use project_environment_request with this name. IronProxy supplies the Authorization header.",
+                }
+              : { name, description },
+          );
           return { content: [{ type: "text", text: JSON.stringify({ variables: metadata }) }] };
         },
       );
@@ -116,12 +131,15 @@ export class EnvironmentBroker {
             });
             const isError = result.exitCode !== 0 || result.stopped !== null;
             return { content: [{ type: "text", text: JSON.stringify(result) }], isError };
-          } catch {
+          } catch (error) {
             return {
               content: [
                 {
                   type: "text",
-                  text: "Environment command failed. Check the selected variable names and workspace availability.",
+                  text:
+                    error instanceof ProxyOnlyError
+                      ? error.message
+                      : "Environment command failed. Check the selected variable names and workspace availability.",
                 },
               ],
               isError: true,
@@ -129,6 +147,53 @@ export class EnvironmentBroker {
           } finally {
             this.lifetime.signal.removeEventListener("abort", cancel);
             extra.signal.removeEventListener("abort", cancel);
+          }
+        },
+      );
+      mcp.registerTool(
+        "project_environment_request",
+        {
+          description:
+            "Perform the configured HTTPS GET using a named IronProxy credential. Discover the approved route with project_environment_list.",
+          inputSchema: z.object({ name: variableName }).strict(),
+        },
+        async ({ name }, extra) => {
+          try {
+            const { variables, secrets } = await this.store.readEffective(binding.scope);
+            const credential = variables.find((v) => v.name === name);
+            if (!credential?.proxyUrl)
+              return {
+                isError: true,
+                content: [
+                  {
+                    type: "text",
+                    text: "No IronProxy route is configured for this name in this workspace.",
+                  },
+                ],
+              };
+            const result = await proxyGet(
+              credential.proxyUrl,
+              credential.value,
+              secrets,
+              AbortSignal.any([extra.signal, this.lifetime.signal]),
+            );
+            return {
+              isError: result.status >= 400,
+              content: [{ type: "text", text: JSON.stringify(result) }],
+            };
+          } catch (error) {
+            return {
+              isError: true,
+              content: [
+                {
+                  type: "text",
+                  text:
+                    error instanceof ProxySetupError
+                      ? error.message
+                      : "IronProxy request failed. Check the approved endpoint and proxy availability.",
+                },
+              ],
+            };
           }
         },
       );

@@ -7,12 +7,14 @@ import { ActionButton } from "./action-button";
 import { Field } from "./field";
 import { SavedVariableEditor } from "./saved-variable-editor";
 import { ValueControls } from "./value";
-import type { variableInput, VariableTarget } from "../shared/environment";
+import { proxyRoute, type variableInput, type VariableTarget } from "../shared/environment";
 import type { z } from "zod";
 
 interface VariableCardProps {
   target: VariableTarget;
   hostId: string;
+  proxyUrl?: string;
+  setRoute(name: string, expected: string | null, url: string | null): Promise<void>;
   name: string;
   description: string;
   theme: PluginTheme;
@@ -22,6 +24,8 @@ interface VariableCardProps {
 export function VariableCard({
   target,
   hostId,
+  proxyUrl,
+  setRoute,
   name,
   description,
   theme,
@@ -29,6 +33,31 @@ export function VariableCard({
   remove,
 }: VariableCardProps) {
   const { t } = useTranslation(messages);
+  const [routing, setRouting] = useState(false);
+  const [route, setUrl] = useState(proxyUrl ?? "");
+  const [busy, setBusy] = useState(false);
+  const [routeError, setRouteError] = useState("");
+  const apply = useCallback(
+    async (url: string | null) => {
+      setBusy(true);
+      setRouteError("");
+      try {
+        await setRoute(name, proxyUrl ?? null, url);
+        setRouting(false);
+      } catch {
+        setRouteError(
+          "Could not change credential access. Check the saved entry and install the approved IronProxy v0.61.0 binary on the Paseo host.",
+        );
+      } finally {
+        setBusy(false);
+      }
+    },
+    [name, proxyUrl, setRoute],
+  );
+  const saveRoute = useCallback(() => void apply(route), [apply, route]);
+  const clearRoute = useCallback(() => void apply(null), [apply]);
+  const toggleRouting = useCallback(() => setRouting((open) => !open), []);
+  const closeRouting = useCallback(() => setRouting(false), []);
   const [editor] = useState(() => new SavedVariableEditor(name, { save, remove }));
   const state = useSyncExternalStore(editor.subscribe, editor.getState);
   const pending = state.status === "pending";
@@ -82,16 +111,59 @@ export function VariableCard({
       ) : null}
       {state.mode === "view" ? (
         <ValueControls
+          proxyUrl={proxyUrl}
           target={target}
           hostId={hostId}
           name={name}
           description={description}
           theme={theme}
         >
+          <ActionButton
+            label={proxyUrl ? "IronProxy settings" : "Use through IronProxy"}
+            onPress={toggleRouting}
+            theme={theme}
+          />
           <ActionButton label={t("replace")} onPress={begin} theme={theme} />
           <ActionButton label={t("remove")} onPress={editor.confirmRemove} theme={theme} />
         </ValueControls>
       ) : null}
+      {routing && state.mode === "view" && (
+        <View style={styles.confirmation}>
+          <Field
+            label="Approved HTTPS GET endpoint"
+            value={route}
+            onChangeText={setUrl}
+            disabled={busy}
+            theme={theme}
+            placeholder="https://api.example.com/v1/account"
+          />
+          <Text style={styles.description}>
+            Agents use this endpoint with a bearer token. Only select a trusted endpoint that keeps
+            request headers private.
+          </Text>
+          <ActionButton
+            label="Save IronProxy route"
+            onPress={saveRoute}
+            disabled={busy || !proxyRoute.safeParse(route).success}
+            theme={theme}
+          />
+          {proxyUrl && (
+            <ActionButton
+              label="Allow commands to read the raw value again"
+              variant="destructive"
+              disabled={busy}
+              theme={theme}
+              onPress={clearRoute}
+            />
+          )}
+          <ActionButton label={t("cancel")} disabled={busy} theme={theme} onPress={closeRouting} />
+          {routeError && (
+            <Text accessibilityRole="alert" style={styles.error}>
+              {routeError}
+            </Text>
+          )}
+        </View>
+      )}
       {state.mode === "replace" ? (
         <>
           <Field

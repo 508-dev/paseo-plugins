@@ -294,6 +294,7 @@ test("the same MCP client uses an updated API key without reopening its agent", 
   expect(tools.tools.map((tool) => tool.name)).toEqual([
     "project_environment_list",
     "project_environment_run",
+    "project_environment_request",
   ]);
   const command = node(
     `fetch('http://127.0.0.1:${address.port}', { headers: { Authorization: 'Bearer ' + process.env.API_KEY } }).then(r => r.text()).then(console.log)`,
@@ -691,4 +692,23 @@ test("bulk add rejects a conflicting batch atomically and can add workspace over
     updated: 1,
   });
   expect(await store.read(scope)).toEqual([{ ...saved, value: "override" }, additions[0]]);
+});
+
+test("proxy routing survives rotations and refuses raw reads and shell injection", async () => {
+  const { store, scope } = await fixture();
+  const v = { name: "TEST_KEY", description: "Account", value: "fake" };
+  const url = "https://example.com/account";
+  await store.save(scope, { ...v, proxyUrl: url });
+  await store.save(scope, { ...v, value: "rotated" });
+  expect((await store.read(scope))[0].proxyUrl).toBe(url);
+  const persisted = JSON.parse(
+    await readFile(path.join(scope.cwd, "data", scope.id + ".json"), "utf8"),
+  );
+  expect(persisted.variables[0]).not.toHaveProperty("value");
+  await expect(store.readValue(scope, v.name)).rejects.toThrow("IronProxy");
+  await expect(
+    execute({ store, scope, input: { command: "true", variables: [v.name] } }),
+  ).rejects.toThrow("project_environment_request");
+  await store.configureProxy(scope, v.name, url, null);
+  expect(await store.readValue(scope, v.name)).toBe("rotated");
 });
