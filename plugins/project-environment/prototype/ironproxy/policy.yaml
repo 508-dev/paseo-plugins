@@ -1,0 +1,30 @@
+dns:
+  enabled: false
+proxy:
+  http_listen: "127.0.0.1:8080"
+  https_listen: "127.0.0.1:8443"
+  # This fixture lives entirely inside a networkless container. Its upstream is loopback.
+  upstream_deny_cidrs: []
+tls:
+  ca_cert: /fixture/ca.crt
+  ca_key: /fixture/ca.key
+transforms:
+  - name: allowlist
+    config:
+      rules:
+        - host: localhost
+          methods: [GET]
+          paths: [/identity]
+  - name: secrets
+    config:
+      secrets:
+        - source:
+            type: env
+            var: FIXTURE_SECRET
+          inject:
+            header: Authorization
+            formatter: "Bearer {{ .Value }}"
+          rules:
+            - host: localhost
+              methods: [GET]
+              paths: [/identity]
