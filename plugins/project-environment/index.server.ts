@@ -2,6 +2,10 @@ import type { PluginHandlerContext, PluginServerContext } from "@getpaseo/plugin
 import { homedir } from "node:os";
 import path from "node:path";
 import {
+  configureProxy,
+  proposedRequests,
+  watchProposals,
+  proxyStatus,
   listVariables,
   saveVariable,
   addVariables,
@@ -12,6 +16,7 @@ import {
   copyVariable,
   type VariableTarget,
 } from "./shared/environment";
+import { ProxySetupError, verifyProxy } from "./server/ironproxy";
 import { parseBulkVariables } from "./shared/bulk-paste";
 import { EnvironmentBroker, toolInstructions } from "./server/broker";
 import { buildVariableCatalogue, readWorkspaceDirectory } from "./server/catalogue";
@@ -129,16 +134,72 @@ export default function contribute(server: PluginServerContext) {
     ]);
     return {
       scopeId: project.id,
-      variables: variables.map(({ name, description }) => ({ name, description })),
-      workspaceVariables: workspaceVariables.map(({ name, description }) => ({
+      variables: variables.map(({ name, description, proxyUrl, proxyMethod, requests }) => ({
         name,
         description,
+        proxyUrl,
+        proxyMethod,
+        requests,
       })),
+      workspaceVariables: workspaceVariables.map(
+        ({ name, description, proxyUrl, proxyMethod, requests }) => ({
+          name,
+          description,
+          proxyUrl,
+          proxyMethod,
+          requests,
+        }),
+      ),
     };
   });
+  server.handle(proxyStatus, async () => {
+    try {
+      await verifyProxy();
+      return { ready: true } as const;
+    } catch (error) {
+      if (!(error instanceof ProxySetupError)) throw error;
+      return { ready: false, detail: error.message } as const;
+    }
+  });
+  server.handle(proposedRequests, async ({ workspaceId, scope, name }, { paseo }) => {
+    const project = await resolveProject(paseo, workspaceId);
+    return {
+      requests: broker.proposals(
+        scope === "workspace" ? (await workspaceScope(project)).id : project.id,
+        scope,
+        name,
+      ),
+    };
+  });
+  server.handle(watchProposals, async ({ target, name, revision }, { paseo }) => {
+    const source = await resolveSource(paseo, target);
+    return broker.watchProposals(source.id, target.kind, name, revision);
+  });
+  server.handle(
+    configureProxy,
+    async (
+      { target, name, expected, url, previousRequests, requests, previousMethod, method },
+      { paseo },
+    ) => {
+      await start();
+      if (url) await verifyProxy();
+      await broker.store.configureProxy(
+        await resolveSource(paseo, target),
+        name,
+        expected,
+        url,
+        previousRequests,
+        requests,
+        previousMethod,
+        method,
+      );
+      return {};
+    },
+  );
   server.handle(saveVariable, async ({ workspaceId, scope, variable }, { paseo }) => {
     await start();
     const project = await resolveProject(paseo, workspaceId);
+    if (variable.proxyUrl) await verifyProxy();
     await broker.store.save(
       scope === "workspace" ? await workspaceScope(project) : project,
       variable,

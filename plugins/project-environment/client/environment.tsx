@@ -7,10 +7,12 @@ import {
   useRpc,
   useWorkspace,
 } from "@getpaseo/plugin/client";
-import { ScrollView } from "@getpaseo/plugin/client/ui";
+import { ScrollView, SettingsSwitch } from "@getpaseo/plugin/client/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { z } from "zod";
 import {
+  type AllowedRequest,
+  proxyRoute,
   listVariables,
   saveVariable,
   removeVariable,
@@ -19,6 +21,7 @@ import {
 import { VariableCard } from "./variable-card";
 import { ActionButton } from "./action-button";
 import { BulkEditor } from "./bulk-editor";
+import { ProxyRouteField } from "./proxy-route-field";
 import { Field } from "./field";
 import { EnvironmentEditor } from "./editor";
 
@@ -59,6 +62,9 @@ function ScopedEnvironment({
   const project = useWorkspace(workspaceId, (workspace) => workspace.projectDisplayName);
   const workspaceName = useWorkspace(workspaceId, (workspace) => workspace.name);
   const isProject = scope === "project";
+  const [useProxy, setUseProxy] = useState(false);
+  const [url, setUrl] = useState("");
+  const [method, setMethod] = useState<AllowedRequest["method"]>("GET");
   const list = useRpc(listVariables);
   const save = useRpc(saveVariable);
   const remove = useRpc(removeVariable);
@@ -70,12 +76,10 @@ function ScopedEnvironment({
   const [notice, setNotice] = useState<
     { name: string } | { added: number; updated: number } | null
   >(null);
-  const invalidate = useCallback(async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["project-environment"] }),
-      queryClient.invalidateQueries({ queryKey: ["project-environment-catalogue"] }),
-    ]);
-  }, [queryClient]);
+  const invalidate = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ["project-environment-catalogue", host.id] });
+    return queryClient.invalidateQueries({ queryKey: ["project-environment", host.id] });
+  }, [queryClient, host.id]);
   const [bulk, setBulk] = useState(false);
   const openBulk = useCallback(() => {
     setNotice(null);
@@ -154,8 +158,8 @@ function ScopedEnvironment({
   }, [data, isProject, workspaceId]);
   const submit = useCallback(() => {
     const existingNames = savedVariables?.map((variable) => variable.name) ?? [];
-    void editor.save(existingNames);
-  }, [editor, savedVariables]);
+    void editor.save(existingNames, useProxy ? url : undefined, method);
+  }, [editor, savedVariables, useProxy, url, method]);
   let messageStyle = styles.detail;
   if (form.status === "error") messageStyle = styles.error;
   if (form.status === "saved") messageStyle = styles.success;
@@ -209,7 +213,12 @@ function ScopedEnvironment({
         {target &&
           savedVariables?.map((variable) => (
             <VariableCard
-              key={variable.name}
+              key={JSON.stringify([variable.name, variable.proxyUrl])}
+              workspaceId={workspaceId}
+              scope={scope}
+              requests={variable.requests}
+              proxyUrl={variable.proxyUrl}
+              proxyMethod={variable.proxyMethod}
               target={target}
               hostId={host.id}
               name={variable.name}
@@ -258,13 +267,34 @@ function ScopedEnvironment({
               theme={theme}
               disabled={pending}
             />
+            <SettingsSwitch
+              label="Protected"
+              hint="Agents can use this credential only for the requests you allow."
+              value={useProxy}
+              onValueChange={setUseProxy}
+              disabled={pending}
+            />
+            {useProxy && (
+              <ProxyRouteField
+                method={method}
+                setMethod={setMethod}
+                theme={theme}
+                value={url}
+                onChangeText={setUrl}
+                disabled={pending}
+              />
+            )}
             <View style={styles.actions}>
               <ActionButton
                 label={pending ? t("adding") : t("addVariable")}
                 onPress={submit}
                 theme={theme}
                 variant="primary"
-                disabled={pending || !variables.isSuccess}
+                disabled={
+                  pending ||
+                  !variables.isSuccess ||
+                  (useProxy && !proxyRoute.safeParse(url).success)
+                }
               />
               <ActionButton
                 label={t("pasteVariables")}

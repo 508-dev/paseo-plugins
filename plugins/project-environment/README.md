@@ -107,3 +107,21 @@ The behavior tests include an API request with an injected key, replacing that k
 See [browser QA captures](docs/qa/README.md) for the scope, search, and inline editing checks.
 
 Registry publication requires interface screenshots and a separate registry submission. This repository currently supports installation from Git.
+
+### Use through IronProxy
+
+In the all-workspaces Variables catalogue, select the shield beside a credential. The workspace Environment panel also offers **Protect**. Pick a preset or select an HTTP method and enter one exact public HTTPS endpoint. GET, POST, PUT, PATCH and DELETE are available for the first request. Agents must explicitly select the default operation by ID when it writes. The endpoint must accept an Authorization bearer token and must keep credentials out of its responses. Agent discovery includes the name, description, approved route and a hint to call `project_environment_request` with the name. Other requests and ordinary variables keep their existing behavior.
+
+In **Protected settings → Add custom request**, give an operation a name, choose GET, POST, PUT, PATCH or DELETE, and enter its exact HTTPS URL. Choose **Allow request** to save and activate the operation immediately. Agents can look up provider documentation and submit suggestions with `project_environment_propose_request`. Suggestions appear live in the credential’s workspace or project settings, including the all-workspaces catalogue. Review the method and exact URL, then choose **Allow**. You can close the popup after confirmation. Drafts expire on plugin restart. The request tool accepts the operation ID and an optional JSON body string for write methods. Approving a write grants repeated use with agent-chosen JSON bodies.
+
+The plugin rejects raw reveal, clipboard reads and shell injection for a proxy credential. An owner can explicitly restore shell access in **Protected settings**. This controls plugin access. Values are still stored in owner-only files, and processes with unrestricted access to the host account can read them.
+
+The host-wide Variables screen shows whether the IronProxy binary is verified. Download the archive for the Paseo daemon from the [IronProxy v0.61.0 release](https://github.com/paradigmxyz/iron-proxy/releases/tag/v0.61.0).
+
+| Host                | Archive                                 | SHA-256                                                            |
+| ------------------- | --------------------------------------- | ------------------------------------------------------------------ |
+| macOS Apple Silicon | `iron-proxy_0.61.0_darwin_arm64.tar.gz` | `ea31caae6200b2dd10aa496b095e6ffe9255ba461cc0663b1cb799c6c3bddcd5` |
+| macOS Intel         | `iron-proxy_0.61.0_darwin_amd64.tar.gz` | `861d1b4a629ae40a8b83c82755cabb098867c2bde671f782598400e016f77f24` |
+| Linux AMD64         | `iron-proxy_0.61.0_linux_amd64.tar.gz`  | `30820ba357b19a41ca6eda77caf7c7105cbd0444343d804711c57b8ae7a3c6a9` |
+
+Verify the archive checksum (on macOS, run `shasum -a 256 <archive>`), extract `iron-proxy`, and install it executable at `~/.local/lib/paseo-project-environment/iron-proxy-v0.61.0` for the daemon account. The plugin checks the pinned binary digest before use, starts a temporary loopback proxy for each request and stops it afterward. It does not follow redirects or accept agent-specified hosts, headers or paths.

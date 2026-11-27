@@ -94,7 +94,13 @@ export async function buildVariableCatalogue({
           const variables = await store.readWorkspace(scope);
           localVariables.set(
             directory,
-            variables.map(({ name, description }) => ({ name, description })),
+            variables.map(({ name, description, proxyUrl, proxyMethod, requests }) => ({
+              name,
+              description,
+              proxyUrl,
+              proxyMethod,
+              requests,
+            })),
           );
         }
       }),

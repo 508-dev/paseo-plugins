@@ -3,16 +3,27 @@ import { messages } from "./messages";
 import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
 import { Text, View } from "react-native";
 import type { PluginTheme } from "@getpaseo/plugin";
+import { ProtectControl } from "./protect-control";
 import { ActionButton } from "./action-button";
+
 import { Field } from "./field";
 import { SavedVariableEditor } from "./saved-variable-editor";
 import { ValueControls } from "./value";
-import type { variableInput, VariableTarget } from "../shared/environment";
+import {
+  type AllowedRequest,
+  type variableInput,
+  type VariableTarget,
+} from "../shared/environment";
 import type { z } from "zod";
 
 interface VariableCardProps {
   target: VariableTarget;
   hostId: string;
+  workspaceId: string;
+  scope: "workspace" | "project";
+  requests?: AllowedRequest[];
+  proxyUrl?: string;
+  proxyMethod?: AllowedRequest["method"];
   name: string;
   description: string;
   theme: PluginTheme;
@@ -22,6 +33,10 @@ interface VariableCardProps {
 export function VariableCard({
   target,
   hostId,
+  workspaceId,
+  requests,
+  proxyUrl,
+  proxyMethod,
   name,
   description,
   theme,
@@ -82,12 +97,17 @@ export function VariableCard({
       ) : null}
       {state.mode === "view" ? (
         <ValueControls
+          proxyUrl={proxyUrl}
+          proxyMethod={proxyMethod}
           target={target}
           hostId={hostId}
           name={name}
           description={description}
           theme={theme}
         >
+          <ProtectControl
+            {...{ name, proxyMethod, proxyUrl, requests, workspaceId, hostId, theme, target }}
+          />
           <ActionButton label={t("replace")} onPress={begin} theme={theme} />
           <ActionButton label={t("remove")} onPress={editor.confirmRemove} theme={theme} />
         </ValueControls>

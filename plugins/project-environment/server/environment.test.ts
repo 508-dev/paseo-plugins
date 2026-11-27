@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { createServer } from "node:http";
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -23,6 +23,14 @@ import { VariableValueController } from "../client/value-controller";
 import { SavedVariableEditor } from "../client/saved-variable-editor";
 import { EnvironmentEditor } from "../client/editor";
 
+import { proxyStatusPresentation } from "../client/proxy-status-presentation";
+import en from "../client/locales/en.json";
+import es from "../client/locales/es.json";
+import ja from "../client/locales/ja.json";
+import ko from "../client/locales/ko.json";
+import zhCN from "../client/locales/zh-CN.json";
+import zhTW from "../client/locales/zh-TW.json";
+
 const execFileAsync = promisify(execFile);
 const cleanup: Array<() => Promise<unknown>> = [];
 afterEach(async () => {
@@ -30,7 +38,7 @@ afterEach(async () => {
   cleanup.length = 0;
 });
 async function fixture() {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-environment-"));
+  const directory = await mkdtemp(path.join(await realpath(tmpdir()), "paseo-environment-"));
   cleanup.push(() => rm(directory, { recursive: true, force: true }));
   const scope = await projectScope(directory);
   const store = new EnvironmentStore(path.join(directory, "data"));
@@ -164,6 +172,10 @@ test("Git worktrees inherit project defaults and can override them independently
   expect(matched.workspaces.map(({ id, variables }) => ({ id, variables }))).toEqual([
     { id: "worktree", variables: [{ name: "API_KEY", description: "Worktree override" }] },
   ]);
+  const [defaultMatch] = filterVariableCatalogue(catalogue.projects, "API_KEY");
+  expect(defaultMatch.variables).toHaveLength(1);
+  expect(defaultMatch.workspaces.map(({ id }) => id)).toEqual(["worktree"]);
+  expect(filterVariableCatalogue(catalogue.projects, " ")[0].workspaces).toHaveLength(2);
   expect(variableCatalogue.output.safeParse(catalogue).success).toBe(true);
   expect(JSON.stringify(catalogue)).not.toContain("worktree-key-test-value");
   await store.remove(mainScope, "API_KEY");
@@ -294,6 +306,8 @@ test("the same MCP client uses an updated API key without reopening its agent", 
   expect(tools.tools.map((tool) => tool.name)).toEqual([
     "project_environment_list",
     "project_environment_run",
+    "project_environment_request",
+    "project_environment_propose_request",
   ]);
   const command = node(
     `fetch('http://127.0.0.1:${address.port}', { headers: { Authorization: 'Bearer ' + process.env.API_KEY } }).then(r => r.text()).then(console.log)`,
@@ -692,3 +706,133 @@ test("bulk add rejects a conflicting batch atomically and can add workspace over
   });
   expect(await store.read(scope)).toEqual([{ ...saved, value: "override" }, additions[0]]);
 });
+
+test("proxy routing survives rotations and refuses raw reads and shell injection", async () => {
+  const { store, scope } = await fixture();
+  const v = { name: "TEST_KEY", description: "Account", value: "fake" };
+  const url = "https://example.com/account";
+  await store.save(scope, { ...v, proxyUrl: url });
+  await store.save(scope, { ...v, value: "rotated" });
+  expect((await store.read(scope))[0].proxyUrl).toBe(url);
+  const persisted = JSON.parse(
+    await readFile(path.join(scope.cwd, "data", scope.id + ".json"), "utf8"),
+  );
+  expect(persisted.variables[0]).not.toHaveProperty("value");
+  await expect(store.readValue(scope, v.name)).rejects.toThrow("IronProxy");
+  await expect(
+    execute({ store, scope, input: { command: "true", variables: [v.name] } }),
+  ).rejects.toThrow("project_environment_request");
+  await store.configureProxy(scope, v.name, url, null);
+  expect(await store.readValue(scope, v.name)).toBe("rotated");
+});
+
+test("an agent suggestion stays unauthorized until the owner saves the exact operation", async () => {
+  const { scope, directory } = await fixture();
+  const broker = new EnvironmentBroker(path.join(directory, "broker"));
+  await broker.start();
+  cleanup.push(() => broker.close());
+  const client = new Client({ name: "proposal-test", version: "1" });
+  await client.connect(new StreamableHTTPClientTransport(new URL(await broker.endpoint(scope))));
+  cleanup.push(() => client.close());
+  const name = "TEST_TOKEN",
+    url = "https://example.com/account";
+  await broker.store.save(scope, { name, description: "fixture", value: "fixture", proxyUrl: url });
+  const request = { id: "update", method: "PATCH" as const, url };
+  const initial = await broker.watchProposals(scope.id, "project", name);
+  expect(initial.requests).toEqual([]);
+  const watching = broker.watchProposals(scope.id, "project", name, initial.revision);
+  await client.callTool({
+    name: "project_environment_propose_request",
+    arguments: { name, request },
+  });
+  expect(await watching).toEqual({ requests: [request], revision: initial.revision + 1 });
+  expect((await broker.watchProposals(scope.id, "workspace", name)).requests).toEqual([]);
+  expect((await broker.watchProposals(scope.id, "project", name)).requests).toEqual([request]);
+  const call = {
+    name: "project_environment_request",
+    arguments: { name, operation: "update", body: "{}" },
+  };
+  expect((await client.callTool(call)).isError).toBe(true);
+  await broker.store.configureProxy(scope, name, url, url, [], [request]);
+  expect(
+    toolText(await client.callTool({ name: "project_environment_list", arguments: {} })),
+  ).toContain("PATCH");
+  await broker.store.configureProxy(scope, name, url, url, [request], []);
+  expect((await client.callTool(call)).isError).toBe(true);
+});
+
+test("catalogue protection supports a write-only first request on a project without a workspace", async () => {
+  const { scope, store } = await fixture();
+  await store.save(scope, { name: "WRITE", description: "", value: "synthetic" });
+  await store.configureProxy(
+    { id: scope.id },
+    "WRITE",
+    null,
+    "https://example.com/item",
+    [],
+    [],
+    "GET",
+    "PATCH",
+  );
+  const [project] = await store.catalogue();
+  expect(project.directory).toBe(scope.cwd);
+  expect(project.variables[0].proxyMethod).toBe("PATCH");
+  await expect(
+    store.configureProxy({ id: scope.id }, "WRITE", "https://example.com/item", null),
+  ).rejects.toThrow("changed");
+  await expect(store.readValue(scope, "WRITE")).rejects.toThrow("IronProxy");
+});
+
+test("proxy status allows retry after a refresh fails with verified data still cached", () => {
+  expect(proxyStatusPresentation({ ready: true, isFetching: false, isError: true })).toEqual({
+    label: "proxyUnavailable",
+    canRecheck: true,
+  });
+  expect(proxyStatusPresentation({ ready: true, isFetching: false, isError: false })).toEqual({
+    label: "proxyVerified",
+    canRecheck: false,
+  });
+});
+
+test("all supported locales translate the proxy status and Recheck", () => {
+  const keys = [
+    "proxyChecking",
+    "proxyUnavailable",
+    "proxyVerified",
+    "proxySetupRequired",
+    "proxyRecheck",
+  ] as const;
+  for (const locale of [es, ja, ko, zhCN, zhTW]) {
+    for (const key of keys) {
+      expect(locale[key].trim()).not.toBe("");
+      expect(locale[key]).not.toBe(en[key]);
+    }
+  }
+});
+
+test.each([undefined, "PUT"] as const)(
+  "a stale save preserves the stored proxy configuration with method %s",
+  async (proxyMethod) => {
+    const { scope, store } = await fixture();
+    const saved = {
+      name: "TEST_TOKEN",
+      value: "fixture",
+      description: "original",
+      proxyUrl: "https://example.com/account",
+      proxyMethod,
+      requests: [{ id: "list", method: "GET" as const, url: "https://example.com/items" }],
+    };
+    await store.save(scope, saved);
+    await store.save(scope, {
+      name: saved.name,
+      value: "replacement",
+      description: "updated",
+      proxyUrl: "https://example.com/other",
+      proxyMethod: "DELETE",
+      requests: [],
+    });
+    expect(await store.read(scope)).toEqual([
+      { ...saved, value: "replacement", description: "updated" },
+    ]);
+  },
+);

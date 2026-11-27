@@ -5,7 +5,51 @@ export const variableName = z
   .string()
   .regex(/^[A-Z_][A-Z0-9_]*$/)
   .max(128);
-export const variableMetadata = z.object({ name: variableName, description: z.string().max(500) });
+// Exact public HTTPS endpoint, with no userinfo, port, query, fragment or wildcard.
+export const proxyRoute = z
+  .string()
+  .max(2048)
+  .refine((text) => {
+    try {
+      const url = new URL(text);
+      return (
+        url.href === text &&
+        url.protocol === "https:" &&
+        !url.port &&
+        !url.username &&
+        !url.password &&
+        !url.search &&
+        !url.hash &&
+        /^[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}$/.test(url.hostname) &&
+        /^\/[A-Za-z0-9_./~-]*$/.test(url.pathname)
+      );
+    } catch {
+      return false;
+    }
+  }, "Use an exact HTTPS URL without query parameters.");
+export const requestMethod = z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]);
+export const allowedRequest = z
+  .object({
+    id: z
+      .string()
+      .regex(/^[a-z][a-z0-9_-]{0,63}$/)
+      .refine((id) => id !== "default"),
+    method: requestMethod,
+    url: proxyRoute,
+  })
+  .strict();
+export type AllowedRequest = z.infer<typeof allowedRequest>;
+export const requestList = z
+  .array(allowedRequest)
+  .max(32)
+  .refine((items) => new Set(items.map((i) => i.id)).size === items.length);
+export const variableMetadata = z.object({
+  name: variableName,
+  description: z.string().max(500),
+  proxyUrl: proxyRoute.optional(),
+  proxyMethod: requestMethod.optional(),
+  requests: requestList.optional(),
+});
 export const variableInput = variableMetadata.extend({
   value: z
     .string()
@@ -16,6 +60,19 @@ export const variableInput = variableMetadata.extend({
 const workspaceInput = z.object({ workspaceId: z.string().min(1) });
 const editScope = workspaceInput.extend({
   scope: z.enum(["project", "workspace"]).default("project"),
+});
+export const proposedRequests = defineRpc({
+  name: "environment.proposed-requests",
+  input: editScope.extend({ name: variableName }),
+  output: z.object({ requests: requestList }),
+});
+export const proxyStatus = defineRpc({
+  name: "environment.proxy-status",
+  input: z.object({}).strict(),
+  output: z.discriminatedUnion("ready", [
+    z.object({ ready: z.literal(true) }),
+    z.object({ ready: z.literal(false), detail: z.string() }),
+  ]),
 });
 export const scopeId = z.string().regex(/^[a-f0-9]{64}$/);
 export const listVariables = defineRpc({
@@ -59,6 +116,29 @@ export const variableTarget = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("workspace"), workspaceId: z.string().min(1) }),
   z.object({ kind: z.literal("project"), scopeId }),
 ]);
+export const watchProposals = defineRpc({
+  name: "environment.watch-proposals",
+  input: z.object({
+    target: variableTarget,
+    name: variableName,
+    revision: z.number().int().optional(),
+  }),
+  output: z.object({ requests: requestList, revision: z.number().int() }),
+});
+export const configureProxy = defineRpc({
+  name: "environment.configure-proxy",
+  input: z.object({
+    target: variableTarget,
+    method: requestMethod.default("GET"),
+    previousMethod: requestMethod.default("GET"),
+    name: variableName,
+    expected: proxyRoute.nullable(),
+    previousRequests: requestList.default([]),
+    requests: requestList.default([]),
+    url: proxyRoute.nullable(),
+  }),
+  output: z.object({}),
+});
 export type VariableTarget = z.infer<typeof variableTarget>;
 export const readVariableValue = defineRpc({
   name: "environment.value",
@@ -132,6 +212,7 @@ export function filterVariableCatalogue(
   query: string,
 ): CatalogueProject[] {
   const terms = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+  if (!terms.length) return projects;
   function matches({ name, description }: z.infer<typeof variableMetadata>) {
     const text = `${name}\n${description}`.toLocaleLowerCase();
     return terms.every((term) => text.includes(term));
@@ -140,9 +221,7 @@ export function filterVariableCatalogue(
     const variables = project.variables.filter(matches);
     const workspaces = project.workspaces.flatMap((workspace) => {
       const localVariables = workspace.variables.filter(matches);
-      return variables.length || localVariables.length
-        ? [{ ...workspace, variables: localVariables }]
-        : [];
+      return localVariables.length ? [{ ...workspace, variables: localVariables }] : [];
     });
     return variables.length || workspaces.length ? [{ ...project, variables, workspaces }] : [];
   });

@@ -4,10 +4,22 @@ import { chmod, mkdir, readFile, readdir, realpath, rename, rm, writeFile } from
 import path from "node:path";
 import { promisify } from "node:util";
 import { z } from "zod";
-import { type CopyStatus, variableInput, variableMetadata } from "../shared/environment";
+import {
+  type CopyStatus,
+  proxyRoute,
+  variableInput,
+  variableMetadata,
+} from "../shared/environment";
 
 const execFileAsync = promisify(execFile);
-const documentSchema = z.object({ variables: z.array(variableInput).max(256) });
+// A plugin version that predates IronProxy must fail closed on a protected record.
+const storedProxyVariable = variableMetadata
+  .extend({ proxyUrl: proxyRoute, proxyValue: variableInput.shape.value })
+  .strict()
+  .transform(({ proxyValue, ...metadata }) => ({ ...metadata, value: proxyValue }));
+const documentSchema = z.object({
+  variables: z.array(z.union([storedProxyVariable, variableInput])).max(256),
+});
 const metadataDocumentSchema = z.object({
   directory: z.string().optional(),
   variables: z.array(variableMetadata).max(256),
@@ -132,6 +144,7 @@ export class EnvironmentStore {
   async readValue(scope: StorageKey, name: string): Promise<string> {
     const variable = (await this.read(scope)).find((entry) => entry.name === name);
     if (!variable) throw new Error("The saved variable is no longer available");
+    if (variable.proxyUrl) throw new Error("This credential is only available through IronProxy.");
     return variable.value;
   }
 
@@ -167,7 +180,11 @@ export class EnvironmentStore {
     return this.change(scope, (variables) => {
       const next = variables.filter((entry) => entry.name !== variable.name);
       if (next.length >= 256) throw new Error("A scope can have at most 256 variables");
-      return [...next, parsed.data].toSorted((a, b) => a.name.localeCompare(b.name));
+      const previous = variables.find((entry) => entry.name === variable.name);
+      const { description, value } = parsed.data;
+      // Existing route policies are changed together through configureProxy.
+      const entry = previous ? { ...previous, description, value } : parsed.data;
+      return [...next, entry].toSorted((a, b) => a.name.localeCompare(b.name));
     });
   }
 
@@ -202,6 +219,35 @@ export class EnvironmentStore {
         added: next.size - variables.length,
         updated: conflicts.length,
       } as const;
+    });
+  }
+
+  async configureProxy(
+    scope: StorageKey & { cwd?: string },
+    name: string,
+    expected: string | null,
+    url: string | null,
+    previousRequests: NonNullable<Variable["requests"]> = [],
+    requests: NonNullable<Variable["requests"]> = [],
+    previousMethod: NonNullable<Variable["proxyMethod"]> = "GET",
+    method: NonNullable<Variable["proxyMethod"]> = "GET",
+  ) {
+    return this.enqueue(async () => {
+      const document = await readJson(this.file(scope));
+      const directory = z.object({ directory: z.string().optional() }).parse(document).directory;
+      const variables = await this.read(scope);
+      const entry = variables.find((v) => v.name === name);
+      if (
+        !entry ||
+        (entry.proxyUrl ?? null) !== expected ||
+        (entry.proxyMethod ?? "GET") !== previousMethod ||
+        JSON.stringify(entry.requests ?? []) !== JSON.stringify(previousRequests)
+      )
+        throw new Error("Credential changed. Refresh and retry.");
+      entry.requests = url && requests.length ? requests : undefined;
+      entry.proxyUrl = url ?? undefined;
+      entry.proxyMethod = url && method !== "GET" ? method : undefined;
+      await this.write({ ...scope, cwd: directory }, variables);
     });
   }
 
@@ -246,8 +292,11 @@ export class EnvironmentStore {
     });
   }
 
-  private write(scope: StorageScope, variables: Variable[]) {
-    return privateWrite(this.file(scope), { directory: scope.cwd, variables });
+  private write(scope: StorageKey & { cwd?: string }, variables: Variable[]) {
+    const records = variables.map(({ value, ...metadata }) =>
+      metadata.proxyUrl ? { ...metadata, proxyValue: value } : { ...metadata, value },
+    );
+    return privateWrite(this.file(scope), { directory: scope.cwd, variables: records });
   }
 
   private enqueue<T>(operation: () => Promise<T>) {

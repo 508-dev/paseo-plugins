@@ -1,11 +1,21 @@
+import { EventEmitter, once } from "node:events";
 import { randomBytes } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import path from "node:path";
 import { z } from "zod";
-import { execute, executionInput } from "./execute";
-import { EnvironmentStore, privateWrite, readJson, type ProjectScope } from "./store";
+import { execute, executionInput, ProxyOnlyError } from "./execute";
+import {
+  EnvironmentStore,
+  workspaceScope,
+  privateWrite,
+  readJson,
+  type ProjectScope,
+} from "./store";
+
+import { proxyRequest, ProxySetupError } from "./ironproxy";
+import { allowedRequest, type AllowedRequest, variableName } from "../shared/environment";
 
 const brokerState = z.object({
   port: z.number().int().min(1).max(65535),
@@ -20,7 +30,7 @@ const brokerState = z.object({
 });
 type BrokerState = z.infer<typeof brokerState>;
 export const toolInstructions =
-  "Use project_environment_list to discover available variable names and descriptions. For commands needing these variables, use project_environment_run and request only the variable names needed. Reference values through environment variables in code; never put values in tool arguments, source files, chat, or logs. Do not print or encode credentials. Commands have host filesystem/network access and can perform actions allowed by the credentials. Values are read fresh on every execution.";
+  "Use project_environment_list to discover available variable names and descriptions. For credentials marked IronProxy, use project_environment_request with the name. For commands needing ordinary variables, use project_environment_run and request only the variable names needed. Reference values through environment variables in code; never put values in tool arguments, source files, chat, or logs. Do not print or encode credentials. Commands have host filesystem/network access and can perform actions allowed by the credentials. Values are read fresh on every execution.";
 
 export class EnvironmentBroker {
   private server: Server | null = null;
@@ -35,6 +45,24 @@ export class EnvironmentBroker {
     this.store = new EnvironmentStore(path.join(directory, "projects"));
   }
 
+  private drafts = new Map<string, AllowedRequest[]>();
+  private draftUpdates = new EventEmitter();
+  proposals(id: string, scope: string, name: string) {
+    return this.drafts.get(JSON.stringify([id, scope, name])) ?? [];
+  }
+  private revisions = new Map<string, number>();
+  async watchProposals(id: string, scope: string, name: string, revision?: number) {
+    const key = JSON.stringify([id, scope, name]);
+    if (revision === (this.revisions.get(key) ?? 0)) {
+      const signal = AbortSignal.any([this.lifetime.signal, AbortSignal.timeout(8000)]);
+      try {
+        await once(this.draftUpdates, key, { signal });
+      } catch (error) {
+        if (!signal.aborted) throw error;
+      }
+    }
+    return { requests: this.proposals(id, scope, name), revision: this.revisions.get(key) ?? 0 };
+  }
   async start(): Promise<void> {
     if (process.platform === "win32")
       throw new Error("Project environment requires a macOS or Linux daemon");
@@ -80,7 +108,24 @@ export class EnvironmentBroker {
         },
         async () => {
           const { variables } = await this.store.readEffective(binding.scope);
-          const metadata = variables.map(({ name, description }) => ({ name, description }));
+          const metadata = variables.map(
+            ({ name, description, proxyUrl, proxyMethod, requests }) =>
+              proxyUrl
+                ? {
+                    name,
+                    description,
+                    mode: "ironproxy",
+                    method: proxyMethod ?? "GET",
+                    url: proxyUrl,
+                    operations: [
+                      { id: "default", method: proxyMethod ?? "GET", url: proxyUrl },
+                      ...(requests ?? []),
+                    ],
+                    usage:
+                      "Use project_environment_request with this name and operation ID. To suggest another operation use project_environment_propose_request, then ask the user to approve it in Protected settings. IronProxy supplies the Authorization header.",
+                  }
+                : { name, description },
+          );
           return { content: [{ type: "text", text: JSON.stringify({ variables: metadata }) }] };
         },
       );
@@ -116,12 +161,15 @@ export class EnvironmentBroker {
             });
             const isError = result.exitCode !== 0 || result.stopped !== null;
             return { content: [{ type: "text", text: JSON.stringify(result) }], isError };
-          } catch {
+          } catch (error) {
             return {
               content: [
                 {
                   type: "text",
-                  text: "Environment command failed. Check the selected variable names and workspace availability.",
+                  text:
+                    error instanceof ProxyOnlyError
+                      ? error.message
+                      : "Environment command failed. Check the selected variable names and workspace availability.",
                 },
               ],
               isError: true,
@@ -130,6 +178,107 @@ export class EnvironmentBroker {
             this.lifetime.signal.removeEventListener("abort", cancel);
             extra.signal.removeEventListener("abort", cancel);
           }
+        },
+      );
+      mcp.registerTool(
+        "project_environment_request",
+        {
+          description:
+            "Call an approved operation by ID. Omit operation for a default GET. For write operations body may be a JSON string.",
+          inputSchema: z
+            .object({
+              name: variableName,
+              operation: z.string().max(64).optional(),
+              body: z.string().max(65536).optional(),
+            })
+            .strict(),
+        },
+        async ({ name, operation, body }, extra) => {
+          try {
+            const { variables, secrets } = await this.store.readEffective(binding.scope);
+            const credential = variables.find((v) => v.name === name);
+            if (!credential?.proxyUrl)
+              return {
+                isError: true,
+                content: [
+                  {
+                    type: "text",
+                    text: "No IronProxy route is configured for this name in this workspace.",
+                  },
+                ],
+              };
+            const selected =
+              operation === "default" || (!operation && (credential.proxyMethod ?? "GET") === "GET")
+                ? { method: credential.proxyMethod ?? "GET", url: credential.proxyUrl }
+                : credential.requests?.find((r) => r.id === operation);
+            if (!selected || (selected.method === "GET" && body !== undefined))
+              return {
+                isError: true,
+                content: [{ type: "text", text: "Request is outside the approved operation." }],
+              };
+            if (body !== undefined) JSON.parse(body);
+            const result = await proxyRequest(
+              selected.url,
+              credential.value,
+              secrets,
+              AbortSignal.any([extra.signal, this.lifetime.signal]),
+              selected.method,
+              body,
+            );
+            return {
+              isError: result.status >= 400,
+              content: [{ type: "text", text: JSON.stringify(result) }],
+            };
+          } catch (error) {
+            return {
+              isError: true,
+              content: [
+                {
+                  type: "text",
+                  text:
+                    error instanceof ProxySetupError
+                      ? error.message
+                      : "IronProxy request failed. Check the approved endpoint and proxy availability.",
+                },
+              ],
+            };
+          }
+        },
+      );
+      mcp.registerTool(
+        "project_environment_propose_request",
+        {
+          description:
+            "Suggest a documented HTTPS operation for a protected credential. This creates a temporary draft for this credential and scope. The owner must choose Allow in Protected settings before use.",
+          inputSchema: z.object({ name: variableName, request: allowedRequest }).strict(),
+        },
+        async ({ name, request: draft }) => {
+          const local = (await this.store.readWorkspace(binding.scope)).find(
+            (v) => v.name === name,
+          );
+          const credential =
+            local ?? (await this.store.read(binding.scope)).find((v) => v.name === name);
+          if (!credential?.proxyUrl)
+            return {
+              isError: true,
+              content: [{ type: "text", text: "Choose an existing protected credential." }],
+            };
+          const id = local ? (await workspaceScope(binding.scope)).id : binding.scope.id;
+          const key = JSON.stringify([id, local ? "workspace" : "project", name]);
+          const drafts = (this.drafts.get(key) ?? []).filter((d) => d.id !== draft.id);
+          if (drafts.length >= 32 || (!this.drafts.has(key) && this.drafts.size >= 1024))
+            return { isError: true, content: [{ type: "text", text: "Proposal limit reached." }] };
+          this.drafts.set(key, [...drafts, draft]);
+          this.revisions.set(key, (this.revisions.get(key) ?? 0) + 1);
+          this.draftUpdates.emit(key);
+          return {
+            content: [
+              {
+                type: "text",
+                text: "Draft ready in Protected settings. Choose Allow to activate it immediately.",
+              },
+            ],
+          };
         },
       );
       response.on("close", () => {

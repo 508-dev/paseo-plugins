@@ -11,7 +11,9 @@ import { AppState, Text, View } from "react-native";
 import type { PluginTheme } from "@getpaseo/plugin";
 import { useTranslation, useRpc } from "@getpaseo/plugin/client";
 import { copyText } from "@getpaseo/plugin/client/ui";
-import { readVariableValue, type VariableTarget } from "../shared/environment";
+import { VariableMenu, type VariableAction } from "./variable-menu";
+import { ProtectControl } from "./protect-control";
+import { readVariableValue, type AllowedRequest, type VariableTarget } from "../shared/environment";
 import { ActionButton } from "./action-button";
 import { CopyDestination } from "./copy-destination";
 import { VariableValueController } from "./value-controller";
@@ -19,20 +21,30 @@ import { VariableValueController } from "./value-controller";
 interface ValueControlsProps {
   target: VariableTarget;
   hostId: string;
+  proxyUrl?: string;
+  proxyMethod?: AllowedRequest["method"];
+  requests?: AllowedRequest[];
   name: string;
   description: string;
   theme: PluginTheme;
   children?: ReactNode;
+  compact?: boolean;
 }
 export function ValueControls({
   target,
   hostId,
+  proxyUrl,
+  proxyMethod,
+  requests,
   name,
   description,
   theme,
   children,
+  compact = false,
 }: ValueControlsProps) {
   const { t } = useTranslation(messages);
+  const [action, setAction] = useState<VariableAction | null>(null);
+  const closeAction = useCallback(() => setAction(null), []);
   const read = useRpc(readVariableValue);
   const [controller] = useState(
     () =>
@@ -78,15 +90,16 @@ export function ValueControls({
         fontSize: 14,
         fontWeight: "600" as const,
         flexShrink: 1,
+        flexGrow: compact ? 1 : 0,
         minWidth: 0,
       },
       heading: {
         flexDirection: "row" as const,
-        gap: 4,
+        gap: compact ? 0 : 4,
         alignItems: "center" as const,
       },
     }),
-    [theme],
+    [theme, compact],
   );
   const busy = state.pending !== null;
   let messageStyle = styles.detail;
@@ -99,23 +112,58 @@ export function ValueControls({
         <Text selectable style={styles.title}>
           {name}
         </Text>
-        <ActionButton
-          label={t(revealed ? "hideValueFor" : "revealValueFor", { name })}
-          icon={revealed ? "EyeOff" : "Eye"}
-          disabled={busy}
-          onPress={reveal}
-          theme={theme}
-        />
-        <ActionButton
-          label={t("copyValueFor", { name })}
-          icon="Clipboard"
-          disabled={busy}
-          onPress={copy}
-          theme={theme}
-        />
+        {!proxyUrl && (
+          <>
+            <ActionButton
+              label={t(revealed ? "hideValueFor" : "revealValueFor", { name })}
+              icon={revealed ? "EyeOff" : "Eye"}
+              compact={compact}
+              disabled={busy}
+              onPress={reveal}
+              theme={theme}
+            />
+            <ActionButton
+              label={t("copyValueFor", { name })}
+              icon="Clipboard"
+              compact={compact}
+              disabled={busy}
+              onPress={copy}
+              theme={theme}
+            />
+          </>
+        )}
+        {compact && (
+          <VariableMenu
+            theme={theme}
+            protectedCredential={Boolean(proxyUrl)}
+            onSelect={setAction}
+          />
+        )}
       </View>
+      {action === "copy" && (
+        <CopyDestination
+          name={name}
+          source={target}
+          hostId={hostId}
+          theme={theme}
+          compact
+          onClose={closeAction}
+        />
+      )}
+      {action === "protect" && (
+        <ProtectControl
+          {...{ name, target, hostId, theme, proxyUrl, proxyMethod, requests }}
+          dialogOnly
+          onClose={closeAction}
+        />
+      )}
+      {proxyUrl && (
+        <Text style={styles.detail}>
+          Protected · {proxyMethod ?? "GET"} {proxyUrl}
+        </Text>
+      )}
       {description ? <Text style={styles.detail}>{description}</Text> : null}
-      {state.revealed !== null ? (
+      {!proxyUrl && state.revealed !== null ? (
         <Text selectable style={styles.value}>
           {state.revealed}
         </Text>
@@ -125,9 +173,11 @@ export function ValueControls({
           {t(state.message)}
         </Text>
       ) : null}
-      <CopyDestination name={name} source={target} hostId={hostId} theme={theme}>
-        {children}
-      </CopyDestination>
+      {!compact && (
+        <CopyDestination name={name} source={target} hostId={hostId} theme={theme}>
+          {children}
+        </CopyDestination>
+      )}
     </>
   );
 }
