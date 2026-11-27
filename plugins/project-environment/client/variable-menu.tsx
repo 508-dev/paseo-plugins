@@ -49,9 +49,14 @@ export function VariableMenu({
   }, [onSelect]);
   const select = useCallback(
     (action: VariableAction) => {
-      close();
-      if (Platform.OS === "ios") pending.current = action;
-      else onSelect(action);
+      // The desktop web modal retains its focus trap until onDismiss fires.
+      if (Platform.OS === "web" || Platform.OS === "ios") {
+        pending.current = action;
+        close();
+      } else {
+        close();
+        onSelect(action);
+      }
     },
     [close, onSelect],
   );
