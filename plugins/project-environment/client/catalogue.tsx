@@ -10,7 +10,6 @@ import {
   type CatalogueProject,
   type VariableTarget,
 } from "../shared/environment";
-import { ProtectControl } from "./protect-control";
 import { ValueControls } from "./value";
 import { ActionButton } from "./action-button";
 import { ProxyStatus } from "./proxy-status";
@@ -299,19 +298,12 @@ function VariableRows({
   theme: Theme;
 }) {
   const row = useMemo(
-    () => ({ borderTopWidth: 1, borderTopColor: theme.colors.border, paddingVertical: 4, gap: 2 }),
+    () => ({ borderTopWidth: 1, borderTopColor: theme.colors.border, paddingVertical: 2, gap: 2 }),
     [theme],
   );
   return variables.map((variable) => (
     <View key={JSON.stringify([variable.name, variable.proxyUrl])} style={row}>
-      <ValueControls {...variable} {...{ theme, hostId, target }} compact>
-        <ProtectControl
-          {...variable}
-          {...{ theme, hostId, target }}
-          workspaceId={target.kind === "workspace" ? target.workspaceId : undefined}
-          compact
-        />
-      </ValueControls>
+      <ValueControls {...variable} {...{ theme, hostId, target }} compact />
     </View>
   ));
 }

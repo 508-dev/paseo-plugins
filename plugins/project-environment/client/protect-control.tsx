@@ -23,7 +23,8 @@ export function ProtectControl({
   proxyUrl,
   proxyMethod,
   requests,
-  compact,
+  showAction = true,
+  onAction,
 }: {
   name: string;
   target: VariableTarget;
@@ -33,7 +34,8 @@ export function ProtectControl({
   proxyUrl?: string;
   proxyMethod?: AllowedRequest["method"];
   requests?: AllowedRequest[];
-  compact?: boolean;
+  showAction?: boolean;
+  onAction?(): void;
 }) {
   const scope = target.kind;
   const { t } = useTranslation(messages);
@@ -79,12 +81,13 @@ export function ProtectControl({
   const saveRoute = useCallback(() => void apply(route), [apply, route]);
   const clearRoute = useCallback(() => void apply(null), [apply]);
   const toggleRouting = useCallback(() => {
+    onAction?.();
     setMethod(proxyMethod ?? "GET");
     setItems(requests ?? []);
     setUrl(proxyUrl ?? "");
     setRouteError("");
     setRouting((open) => !open);
-  }, [requests, proxyUrl, proxyMethod]);
+  }, [requests, proxyUrl, proxyMethod, onAction]);
   const closeRouting = useCallback(() => setRouting(false), []);
   const dismiss = useCallback(
     (open: boolean) => {
@@ -106,12 +109,13 @@ export function ProtectControl({
   );
   return (
     <>
-      <ActionButton
-        label={proxyUrl ? "Protected settings" : "Protect"}
-        icon={compact ? (proxyUrl ? "ShieldCheck" : "Shield") : undefined}
-        onPress={toggleRouting}
-        theme={theme}
-      />
+      {showAction && (
+        <ActionButton
+          label={proxyUrl ? "Protected settings" : "Protect"}
+          onPress={toggleRouting}
+          theme={theme}
+        />
+      )}
       {routing && (
         <Modal
           title={`Protect ${name} · ${scope === "project" ? "Project defaults" : "Workspace"}`}

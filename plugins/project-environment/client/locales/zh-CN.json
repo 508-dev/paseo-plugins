@@ -4,6 +4,7 @@
   "projectEnvironment": "项目环境",
   "searchEnvironment": "搜索环境变量",
   "workspacePicker": "工作区",
+  "variableActions": "变量操作",
   "openVariables": "打开变量",
   "directoryUnavailable": "原项目位置不可用。",
   "projectDefaults": "项目默认值",

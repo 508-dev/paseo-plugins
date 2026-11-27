@@ -30,6 +30,8 @@ export function CopyDestination({
   theme,
   children,
   compact = false,
+  showAction = true,
+  onAction,
 }: {
   name: string;
   source: VariableTarget;
@@ -37,6 +39,8 @@ export function CopyDestination({
   theme: PluginTheme;
   children?: ReactNode;
   compact?: boolean;
+  showAction?: boolean;
+  onAction?(): void;
 }) {
   const { t } = useTranslation(messages);
   const toast = useToast();
@@ -75,6 +79,7 @@ export function CopyDestination({
   });
   const { mutate, reset, isPending } = transfer;
   const show = useCallback(() => {
+    onAction?.();
     reset();
     setQuery("");
     setScope("project");
@@ -82,7 +87,7 @@ export function CopyDestination({
     setRequiresOverwrite(false);
     setDestination(null);
     setOpen(true);
-  }, [reset]);
+  }, [reset, onAction]);
   const cancel = useCallback(() => {
     reset();
     setOpen(false);
@@ -309,7 +314,7 @@ export function CopyDestination({
   if (!compact) return picker;
   return (
     <>
-      <ActionButton label={t("copyTo")} icon="Ellipsis" onPress={show} theme={theme} />
+      {showAction && <ActionButton label={t("copyTo")} onPress={show} theme={theme} />}
       {open && (
         <Modal title={t("copyNameTo", { name })} open={open} onOpenChange={dismiss}>
           <Modal.Content>{picker}</Modal.Content>

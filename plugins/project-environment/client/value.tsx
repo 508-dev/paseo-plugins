@@ -11,7 +11,8 @@ import { AppState, Text, View } from "react-native";
 import type { PluginTheme } from "@getpaseo/plugin";
 import { useTranslation, useRpc } from "@getpaseo/plugin/client";
 import { copyText } from "@getpaseo/plugin/client/ui";
-import { readVariableValue, type VariableTarget } from "../shared/environment";
+import { ProtectControl } from "./protect-control";
+import { readVariableValue, type AllowedRequest, type VariableTarget } from "../shared/environment";
 import { ActionButton } from "./action-button";
 import { CopyDestination } from "./copy-destination";
 import { VariableValueController } from "./value-controller";
@@ -20,7 +21,8 @@ interface ValueControlsProps {
   target: VariableTarget;
   hostId: string;
   proxyUrl?: string;
-  proxyMethod?: string;
+  proxyMethod?: AllowedRequest["method"];
+  requests?: AllowedRequest[];
   name: string;
   description: string;
   theme: PluginTheme;
@@ -32,6 +34,7 @@ export function ValueControls({
   hostId,
   proxyUrl,
   proxyMethod,
+  requests,
   name,
   description,
   theme,
@@ -39,6 +42,9 @@ export function ValueControls({
   compact = false,
 }: ValueControlsProps) {
   const { t } = useTranslation(messages);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const toggleMenu = useCallback(() => setMenuOpen((open) => !open), []);
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
   const read = useRpc(readVariableValue);
   const [controller] = useState(
     () =>
@@ -87,9 +93,17 @@ export function ValueControls({
         flexGrow: compact ? 1 : 0,
         minWidth: 0,
       },
+      menu: {
+        flexDirection: "row" as const,
+        flexWrap: "wrap" as const,
+        gap: 6,
+        alignSelf: "flex-end" as const,
+        backgroundColor: theme.colors.surface2,
+        borderRadius: 8,
+      },
       heading: {
         flexDirection: "row" as const,
-        gap: 4,
+        gap: compact ? 0 : 4,
         alignItems: "center" as const,
       },
     }),
@@ -111,6 +125,7 @@ export function ValueControls({
             <ActionButton
               label={t(revealed ? "hideValueFor" : "revealValueFor", { name })}
               icon={revealed ? "EyeOff" : "Eye"}
+              compact={compact}
               disabled={busy}
               onPress={reveal}
               theme={theme}
@@ -118,17 +133,43 @@ export function ValueControls({
             <ActionButton
               label={t("copyValueFor", { name })}
               icon="Clipboard"
+              compact={compact}
               disabled={busy}
               onPress={copy}
               theme={theme}
             />
           </>
         )}
-        {compact && children}
         {compact && (
-          <CopyDestination name={name} source={target} hostId={hostId} theme={theme} compact />
+          <ActionButton
+            icon="Ellipsis"
+            label={t("variableActions")}
+            expanded={menuOpen}
+            onPress={toggleMenu}
+            theme={theme}
+            compact
+          />
         )}
       </View>
+      {compact && (
+        <View style={styles.menu}>
+          <CopyDestination
+            name={name}
+            source={target}
+            hostId={hostId}
+            theme={theme}
+            compact
+            showAction={menuOpen}
+            onAction={closeMenu}
+          />
+          <ProtectControl
+            {...{ name, target, hostId, theme, proxyUrl, proxyMethod, requests }}
+            workspaceId={target.kind === "workspace" ? target.workspaceId : undefined}
+            showAction={menuOpen}
+            onAction={closeMenu}
+          />
+        </View>
+      )}
       {proxyUrl && (
         <Text style={styles.detail}>
           Protected · {proxyMethod ?? "GET"} {proxyUrl}

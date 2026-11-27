@@ -4,6 +4,7 @@
   "projectEnvironment": "Entorno del proyecto",
   "searchEnvironment": "Buscar variables de entorno",
   "workspacePicker": "Espacio de trabajo",
+  "variableActions": "Acciones de variable",
   "openVariables": "Abrir variables",
   "directoryUnavailable": "La ubicación original del proyecto no está disponible.",
   "projectDefaults": "Valores del proyecto",
