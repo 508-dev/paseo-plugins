@@ -12,6 +12,7 @@ import {
 } from "../shared/environment";
 import { ValueControls } from "./value";
 import { ActionButton } from "./action-button";
+import { ProxyStatus } from "./proxy-status";
 import { Field } from "./field";
 
 type OpenEditor = (workspaceId: string) => void;
@@ -374,6 +375,7 @@ export function VariableCatalogueScreen({
         <Text style={styles.title}>{t("variables")}</Text>
         <Text style={styles.detail}>{t("catalogueIntro", { host: host.label })}</Text>
       </View>
+      <ProxyStatus theme={theme} hostId={host.id} />
       <Field
         label={t("searchVariables")}
         value={query}

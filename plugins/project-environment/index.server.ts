@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import path from "node:path";
 import {
   configureProxy,
+  proxyStatus,
   listVariables,
   saveVariable,
   addVariables,
@@ -13,7 +14,7 @@ import {
   copyVariable,
   type VariableTarget,
 } from "./shared/environment";
-import { verifyProxy } from "./server/ironproxy";
+import { ProxySetupError, verifyProxy } from "./server/ironproxy";
 import { parseBulkVariables } from "./shared/bulk-paste";
 import { EnvironmentBroker, toolInstructions } from "./server/broker";
 import { buildVariableCatalogue, readWorkspaceDirectory } from "./server/catalogue";
@@ -142,6 +143,15 @@ export default function contribute(server: PluginServerContext) {
         proxyUrl,
       })),
     };
+  });
+  server.handle(proxyStatus, async () => {
+    try {
+      await verifyProxy();
+      return { ready: true } as const;
+    } catch (error) {
+      if (!(error instanceof ProxySetupError)) throw error;
+      return { ready: false, detail: error.message } as const;
+    }
   });
   server.handle(configureProxy, async ({ workspaceId, scope, name, expected, url }, { paseo }) => {
     await start();

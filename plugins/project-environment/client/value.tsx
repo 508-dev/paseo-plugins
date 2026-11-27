@@ -126,7 +126,7 @@ export function ValueControls({
           <CopyDestination name={name} source={target} hostId={hostId} theme={theme} compact />
         )}
       </View>
-      {proxyUrl && <Text style={styles.detail}>IronProxy · GET {proxyUrl}</Text>}
+      {proxyUrl && <Text style={styles.detail}>Protected · GET {proxyUrl}</Text>}
       {description ? <Text style={styles.detail}>{description}</Text> : null}
       {!proxyUrl && state.revealed !== null ? (
         <Text selectable style={styles.value}>

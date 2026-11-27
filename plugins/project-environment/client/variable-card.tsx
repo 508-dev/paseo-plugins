@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
 import { Text, View } from "react-native";
 import type { PluginTheme } from "@getpaseo/plugin";
 import { ActionButton } from "./action-button";
+import { ProxyRouteField } from "./proxy-route-field";
 import { Field } from "./field";
 import { SavedVariableEditor } from "./saved-variable-editor";
 import { ValueControls } from "./value";
@@ -119,7 +120,7 @@ export function VariableCard({
           theme={theme}
         >
           <ActionButton
-            label={proxyUrl ? "IronProxy settings" : "Use through IronProxy"}
+            label={proxyUrl ? "Protected settings" : "Protect"}
             onPress={toggleRouting}
             theme={theme}
           />
@@ -129,20 +130,9 @@ export function VariableCard({
       ) : null}
       {routing && state.mode === "view" && (
         <View style={styles.confirmation}>
-          <Field
-            label="Approved HTTPS GET endpoint"
-            value={route}
-            onChangeText={setUrl}
-            disabled={busy}
-            theme={theme}
-            placeholder="https://api.example.com/v1/account"
-          />
-          <Text style={styles.description}>
-            Agents use this endpoint with a bearer token. Only select a trusted endpoint that keeps
-            request headers private.
-          </Text>
+          <ProxyRouteField value={route} onChangeText={setUrl} disabled={busy} theme={theme} />
           <ActionButton
-            label="Save IronProxy route"
+            label="Save protected route"
             onPress={saveRoute}
             disabled={busy || !proxyRoute.safeParse(route).success}
             theme={theme}

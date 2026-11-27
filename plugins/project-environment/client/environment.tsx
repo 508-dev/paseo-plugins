@@ -21,6 +21,7 @@ import {
 import { VariableCard } from "./variable-card";
 import { ActionButton } from "./action-button";
 import { BulkEditor } from "./bulk-editor";
+import { ProxyRouteField } from "./proxy-route-field";
 import { Field } from "./field";
 import { EnvironmentEditor } from "./editor";
 
@@ -274,27 +275,15 @@ function ScopedEnvironment({
               disabled={pending}
             />
             <ActionButton
-              label={useProxy ? "Use through IronProxy ✓" : "Use through IronProxy"}
+              label="Protected"
               selected={useProxy}
+              variant={useProxy ? "primary" : "outline"}
               disabled={pending}
               theme={theme}
               onPress={toggleProxy}
             />
             {useProxy && (
-              <>
-                <Field
-                  label="Approved HTTPS GET endpoint"
-                  theme={theme}
-                  value={url}
-                  onChangeText={setUrl}
-                  disabled={pending}
-                  placeholder="https://api.example.com/v1/account"
-                />
-                <Text style={styles.detail}>
-                  IronProxy supplies the bearer token. Shell injection and value reveal are
-                  disabled. Install IronProxy v0.61.0 on the Paseo host before saving.
-                </Text>
-              </>
+              <ProxyRouteField theme={theme} value={url} onChangeText={setUrl} disabled={pending} />
             )}
             <View style={styles.actions}>
               <ActionButton

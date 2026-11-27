@@ -43,6 +43,14 @@ const workspaceInput = z.object({ workspaceId: z.string().min(1) });
 const editScope = workspaceInput.extend({
   scope: z.enum(["project", "workspace"]).default("project"),
 });
+export const proxyStatus = defineRpc({
+  name: "environment.proxy-status",
+  input: z.object({}).strict(),
+  output: z.discriminatedUnion("ready", [
+    z.object({ ready: z.literal(true) }),
+    z.object({ ready: z.literal(false), detail: z.string() }),
+  ]),
+});
 export const configureProxy = defineRpc({
   name: "environment.configure-proxy",
   input: editScope.extend({
