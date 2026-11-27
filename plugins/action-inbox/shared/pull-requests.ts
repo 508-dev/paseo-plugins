@@ -26,11 +26,15 @@ const pullRequest = z.object({
 export type InboxPullRequest = z.infer<typeof pullRequest>;
 export const listPullRequests = defineRpc({
   name: "pull_requests.list",
-  input: z.object({ cursor: z.string().optional() }),
+  input: z.object({
+    cursor: z.string().optional(),
+    refresh: z.enum(["background", "force"]).optional(),
+  }),
   output: z.object({
     pullRequests: z.array(pullRequest),
     errors: z.array(z.string()),
     nextCursor: z.string().nullable(),
+    stale: z.boolean().optional(),
   }),
 });
 const selection = z.object({

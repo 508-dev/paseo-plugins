@@ -5,7 +5,8 @@ import type { PaseoApi } from "@getpaseo/client";
 import { beforeEach, expect, it, vi } from "vitest";
 import { discoverPullRequests, readBranch } from "./discovery.js";
 import { readPullRequest } from "./github.js";
-import { runCommand, startInboxBridge, summarizePullRequest } from "./inbox.js";
+import { createPullRequestReader } from "./read-cache.js";
+import { createInboxReader, runCommand, startInboxBridge, summarizePullRequest } from "./inbox.js";
 
 vi.mock("./discovery.js", () => ({ discoverPullRequests: vi.fn(), readBranch: vi.fn() }));
 vi.mock("./github.js", async (original) => ({
@@ -165,4 +166,56 @@ it("serves only authenticated local commands and removes its endpoint on stop", 
       await rm(directory, { recursive: true, force: true });
     }
   }
+});
+
+it("serves the last known page immediately and coalesces its background refresh", async () => {
+  const { paseo, watcher } = setup();
+  const now = vi.spyOn(Date, "now").mockReturnValue(0);
+  try {
+    const read = createInboxReader();
+    const list = { operation: "list" as const };
+    const first = await read(list, paseo, watcher);
+    expect(first.stale).toBe(false);
+    now.mockReturnValue(31_000);
+    expect(await read(list, paseo, watcher)).toMatchObject({
+      pullRequests: first.pullRequests,
+      stale: true,
+    });
+    expect(paseo.workspaces.list).toHaveBeenCalledTimes(1);
+    const refresh = { ...list, refresh: "background" as const };
+    const [a, b] = await Promise.all([
+      read(refresh, paseo, watcher),
+      read(refresh, paseo, watcher),
+    ]);
+    expect(a).toEqual(b);
+    expect(a.stale).toBe(false);
+    expect(paseo.workspaces.list).toHaveBeenCalledTimes(2);
+    expect(discoverPullRequests).toHaveBeenCalledTimes(1);
+    expect(readPullRequest).toHaveBeenCalledTimes(1);
+  } finally {
+    now.mockRestore();
+  }
+});
+
+it("shares watcher snapshots with the inbox and allows a forced refresh", async () => {
+  const { paseo, watcher } = setup();
+  const readSnapshot = createPullRequestReader();
+  await readSnapshot(pr);
+  const read = createInboxReader(readSnapshot);
+  const list = { operation: "list" as const };
+  await read(list, paseo, watcher);
+  expect(readPullRequest).toHaveBeenCalledTimes(1);
+  vi.mocked(readPullRequest).mockResolvedValue(base);
+  const refreshed = await read({ ...list, refresh: "force" }, paseo, watcher);
+  expect(refreshed.pullRequests[0]?.issues).toEqual([]);
+  expect(readPullRequest).toHaveBeenCalledTimes(2);
+  expect(discoverPullRequests).toHaveBeenCalledTimes(2);
+});
+
+it("does not cache a failed GitHub read or block a subsequent fresh retry", async () => {
+  const readSnapshot = createPullRequestReader();
+  vi.mocked(readPullRequest).mockRejectedValueOnce(new Error("temporarily unavailable"));
+  await expect(readSnapshot(pr)).rejects.toThrow("temporarily unavailable");
+  await expect(readSnapshot(pr, 90_000)).resolves.toMatchObject({ state: "OPEN" });
+  expect(readPullRequest).toHaveBeenCalledTimes(2);
 });

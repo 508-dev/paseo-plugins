@@ -74,33 +74,51 @@ export function PullRequestsScreen({ theme, layout, host, navigation }: PluginSc
   const [rows, setRows] = useState<InboxPullRequest[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(false);
   const [onlyAttention, setOnlyAttention] = useState(true);
   const [error, setError] = useState("");
   const [skipped, setSkipped] = useState<string[]>([]);
   const [selection, setSelection] = useState<Selection | null>(null);
   const [sent, setSent] = useState<Record<string, { agentId: string; name: string }>>({});
   const version = useRef(0);
+  const watchVersion = useRef(0);
+  const hasLoaded = useRef(false);
   const [managedUrl, setManagedUrl] = useState<string | null>(null);
   const buttons = { theme, compact: layout.compact };
   const muted = { color: theme.colors.foregroundMuted, fontSize: 13 };
   const refresh = useCallback(
-    async (page?: string) => {
+    async (page?: string, force = false) => {
       const request = ++version.current;
-      setLoading(true);
+      const watchesAtStart = watchVersion.current;
+      setLoading(force || page !== undefined || !hasLoaded.current);
+      setUpdating(false);
       setError("");
-      try {
-        const result = await list({ cursor: page });
-        if (request !== version.current) return;
+      const apply = (result: Awaited<ReturnType<typeof list>>) => {
+        if (request !== version.current || watchesAtStart !== watchVersion.current) return;
+        hasLoaded.current = true;
         setRows((current) => mergePages(page ? current : [], result.pullRequests));
         setCursor(result.nextCursor);
         setSkipped((previous) => [
           ...new Set(page ? [...previous, ...result.errors] : result.errors),
         ]);
+      };
+      try {
+        const result = await list({ cursor: page, refresh: force ? "force" : undefined });
+        if (request !== version.current) return;
+        apply(result);
+        if (result.stale) {
+          setLoading(false);
+          setUpdating(true);
+          apply(await list({ cursor: page, refresh: "background" }));
+        }
       } catch (failure) {
         if (request === version.current)
           setError(failure instanceof Error ? failure.message : String(failure));
       } finally {
-        if (request === version.current) setLoading(false);
+        if (request === version.current) {
+          setLoading(false);
+          setUpdating(false);
+        }
       }
     },
     [list],
@@ -114,6 +132,7 @@ export function PullRequestsScreen({ theme, layout, host, navigation }: PluginSc
 
   async function stopWatch(id: string) {
     await act({ operation: "stop", id });
+    watchVersion.current += 1;
     setRows((current) =>
       current.map((pr) => ({ ...pr, watches: pr.watches.filter((item) => item.id !== id) })),
     );
@@ -208,11 +227,11 @@ export function PullRequestsScreen({ theme, layout, host, navigation }: PluginSc
                   variant="outline"
                   label={t("refresh")}
                   disabled={loading}
-                  onPress={() => void refresh()}
+                  onPress={() => void refresh(undefined, true)}
                 />
               </View>
             </View>
-            {loading ? <Text style={muted}>{t("prLoading")}</Text> : null}
+            {loading || updating ? <Text style={muted}>{t("prLoading")}</Text> : null}
             {skipped.length > 0 ? (
               <Text style={muted}>{t("prSkipped", { workspaces: skipped.join(", ") })}</Text>
             ) : null}
@@ -374,6 +393,7 @@ export function PullRequestsScreen({ theme, layout, host, navigation }: PluginSc
                 : { ...input, operation: "fix", messageId: selection.messageId },
             );
             if (result.watch) {
+              watchVersion.current += 1;
               const watch = result.watch;
               setRows((current) =>
                 current.map((row) =>

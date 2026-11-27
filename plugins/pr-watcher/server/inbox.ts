@@ -13,6 +13,7 @@ import {
   type PullRequestRef,
   type PullRequestSnapshot,
 } from "./github.js";
+import { createPullRequestReader, ReadCache, type PullRequestReader } from "./read-cache.js";
 import type { Watcher } from "./watcher.js";
 import { validateWorkspaceWatch, workspaceWatchAccess } from "./workspace.js";
 
@@ -25,7 +26,11 @@ const selection = z.object({
   pullRequest: z.string().min(1).max(2048),
 });
 const command = z.discriminatedUnion("operation", [
-  z.object({ operation: z.literal("list"), cursor: z.string().max(2048).optional() }),
+  z.object({
+    operation: z.literal("list"),
+    cursor: z.string().max(2048).optional(),
+    refresh: z.enum(["background", "force"]).optional(),
+  }),
   selection.extend({ operation: z.literal("watch") }),
   selection.extend({ operation: z.literal("fix"), messageId: z.string().min(1).max(200) }),
   z.object({ operation: z.literal("stop"), id: z.string().min(1).max(200) }),
@@ -66,7 +71,32 @@ export function summarizePullRequest(snapshot: PullRequestSnapshot) {
 type Target = { workspaceId: string; workspaceName: string; expectedBranch: string };
 type Ref = PullRequestRef & { title?: string; targets: Target[] };
 
-async function listInbox(paseo: PaseoApi, watcher: Pick<Watcher, "list">, cursor?: string) {
+type InboxWatcher = Pick<Watcher, "list" | "add" | "remove">;
+const pageFreshMs = 30_000;
+const pageMaxAgeMs = 10 * 60_000;
+const discoveryMaxAgeMs = 2 * 60_000;
+const snapshotMaxAgeMs = 90_000;
+
+function watchesFor(ref: PullRequestRef, watches: ReturnType<Watcher["list"]>) {
+  return watches
+    .filter(
+      (watch) => watch.url.toLowerCase() === ref.url.toLowerCase() && watch.status !== "closed",
+    )
+    .map(({ id, agentId, workspaceId, status, lastError }) => ({
+      id,
+      agentId,
+      workspaceId,
+      status,
+      lastError,
+    }));
+}
+
+async function listInbox(
+  paseo: PaseoApi,
+  watcher: Pick<Watcher, "list">,
+  lookup: { discover: typeof discoverPullRequests; snapshot: PullRequestReader },
+  cursor?: string,
+) {
   const source = await paseo.workspaces.list({
     page: { limit: 6, ...(cursor ? { cursor } : {}) },
     sort: [{ key: "activity_at", direction: "desc" }],
@@ -84,9 +114,7 @@ async function listInbox(paseo: PaseoApi, watcher: Pick<Watcher, "list">, cursor
       try {
         return {
           workspace,
-          result: await discoverPullRequests(
-            workspace.workspaceDirectory ?? workspace.projectRootPath,
-          ),
+          result: await lookup.discover(workspace.workspaceDirectory ?? workspace.projectRootPath),
         };
       } catch {
         errors.push(workspace.name);
@@ -113,17 +141,9 @@ async function listInbox(paseo: PaseoApi, watcher: Pick<Watcher, "list">, cursor
   for (let index = 0; index < entries.length; index += 5) {
     const batch = await Promise.all(
       entries.slice(index, index + 5).map(async (ref) => {
-        const matching = watches
-          .filter((watch) => keyFor(watch) === keyFor(ref))
-          .map(({ id, agentId, workspaceId, status, lastError }) => ({
-            id,
-            agentId,
-            workspaceId,
-            status,
-            lastError,
-          }));
+        const matching = watchesFor(ref, watches);
         try {
-          const snapshot = await readPullRequest(ref);
+          const snapshot = await lookup.snapshot(ref);
           if (snapshot.state !== "OPEN" && matching.length === 0) return null;
           const { status, issues } = summarizePullRequest(snapshot);
           return {
@@ -149,12 +169,51 @@ async function listInbox(paseo: PaseoApi, watcher: Pick<Watcher, "list">, cursor
   return { pullRequests, errors, nextCursor: source.pageInfo.nextCursor ?? null };
 }
 
+export function createInboxReader(readSnapshot: PullRequestReader = createPullRequestReader()) {
+  const pages = new ReadCache<Awaited<ReturnType<typeof listInbox>>>(24);
+  const discoveries = new ReadCache<Awaited<ReturnType<typeof discoverPullRequests>>>(128);
+  return async (
+    input: Extract<z.infer<typeof command>, { operation: "list" }>,
+    paseo: PaseoApi,
+    watcher: Pick<Watcher, "list">,
+  ) => {
+    const key = input.cursor ?? "";
+    const cached = !input.refresh ? pages.peek(key, pageMaxAgeMs) : undefined;
+    const stale = cached !== undefined && pages.peek(key, pageFreshMs) === undefined;
+    const force = input.refresh === "force";
+    const page =
+      cached ??
+      (await pages.read(key, 0, () =>
+        listInbox(
+          paseo,
+          watcher,
+          {
+            discover: (cwd) =>
+              discoveries.read(cwd, force ? 0 : discoveryMaxAgeMs, () => discoverPullRequests(cwd)),
+            snapshot: (ref) => readSnapshot(ref, force ? 0 : snapshotMaxAgeMs),
+          },
+          input.cursor,
+        ),
+      ));
+    const watches = watcher.list();
+    return {
+      ...page,
+      stale,
+      pullRequests: page.pullRequests.flatMap((row) => {
+        const current = watchesFor(row, watches);
+        return row.targets.length > 0 || current.length > 0 ? [{ ...row, watches: current }] : [];
+      }),
+    };
+  };
+}
+
 export async function runCommand(
   input: z.infer<typeof command>,
   paseo: PaseoApi,
-  watcher: Pick<Watcher, "list" | "add" | "remove">,
+  watcher: InboxWatcher,
+  readInbox = createInboxReader(),
 ) {
-  if (input.operation === "list") return listInbox(paseo, watcher, input.cursor);
+  if (input.operation === "list") return readInbox(input, paseo, watcher);
   if (input.operation === "stop") {
     await watcher.remove(input.id);
     return {};
@@ -204,14 +263,14 @@ export async function runCommand(
 
 export function startInboxBridge(
   getPaseo: () => PaseoApi | null,
-  watcher: Pick<Watcher, "list" | "add" | "remove">,
+  watcher: InboxWatcher,
   ready: Promise<void>,
   file = endpoint(),
+  readInbox = createInboxReader(),
 ) {
   let stopped = false;
   const token = randomBytes(32).toString("hex");
   const credentials = Buffer.from(`Bearer ${token}`);
-  const flights = new Map<string, Promise<unknown>>();
   const server = createServer(async (request, response) => {
     function send(status: number, body: unknown) {
       response.writeHead(status, { "Content-Type": "application/json" });
@@ -238,17 +297,7 @@ export function startInboxBridge(
       const paseo = getPaseo();
       if (!paseo) throw new Error("PR Watcher is still connecting. Refresh in a moment.");
       await ready;
-      const key = input.operation === "list" ? JSON.stringify(input.cursor ?? null) : null;
-      let result = key === null ? undefined : flights.get(key);
-      if (!result) {
-        result = runCommand(input, paseo, watcher);
-        if (key !== null) flights.set(key, result);
-      }
-      try {
-        send(200, await result);
-      } finally {
-        if (key !== null && flights.get(key) === result) flights.delete(key);
-      }
+      send(200, await runCommand(input, paseo, watcher, readInbox));
     } catch (error) {
       send(400, {
         error: error instanceof Error ? error.message : "Could not complete the PR request.",
