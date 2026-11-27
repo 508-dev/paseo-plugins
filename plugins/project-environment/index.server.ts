@@ -4,6 +4,7 @@ import path from "node:path";
 import {
   configureProxy,
   proposedRequests,
+  watchProposals,
   proxyStatus,
   listVariables,
   saveVariable,
@@ -162,7 +163,17 @@ export default function contribute(server: PluginServerContext) {
   });
   server.handle(proposedRequests, async ({ workspaceId, scope, name }, { paseo }) => {
     const project = await resolveProject(paseo, workspaceId);
-    return { requests: broker.proposals(project.cwd, scope, name) };
+    return {
+      requests: broker.proposals(
+        scope === "workspace" ? (await workspaceScope(project)).id : project.id,
+        scope,
+        name,
+      ),
+    };
+  });
+  server.handle(watchProposals, async ({ target, name, revision }, { paseo }) => {
+    const source = await resolveSource(paseo, target);
+    return broker.watchProposals(source.id, target.kind, name, revision);
   });
   server.handle(
     configureProxy,

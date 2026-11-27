@@ -730,11 +730,16 @@ test("an agent suggestion stays unauthorized until the owner saves the exact ope
     url = "https://example.com/account";
   await broker.store.save(scope, { name, description: "fixture", value: "fixture", proxyUrl: url });
   const request = { id: "update", method: "PATCH" as const, url };
+  const initial = await broker.watchProposals(scope.id, "project", name);
+  expect(initial.requests).toEqual([]);
+  const watching = broker.watchProposals(scope.id, "project", name, initial.revision);
   await client.callTool({
     name: "project_environment_propose_request",
     arguments: { name, request },
   });
-  expect(broker.proposals(scope.cwd, "project", name)).toEqual([request]);
+  expect(await watching).toEqual({ requests: [request], revision: initial.revision + 1 });
+  expect((await broker.watchProposals(scope.id, "workspace", name)).requests).toEqual([]);
+  expect((await broker.watchProposals(scope.id, "project", name)).requests).toEqual([request]);
   const call = {
     name: "project_environment_request",
     arguments: { name, operation: "update", body: "{}" },

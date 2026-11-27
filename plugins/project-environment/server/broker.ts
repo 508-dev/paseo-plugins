@@ -1,3 +1,4 @@
+import { EventEmitter, once } from "node:events";
 import { randomBytes } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -5,7 +6,13 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import path from "node:path";
 import { z } from "zod";
 import { execute, executionInput, ProxyOnlyError } from "./execute";
-import { EnvironmentStore, privateWrite, readJson, type ProjectScope } from "./store";
+import {
+  EnvironmentStore,
+  workspaceScope,
+  privateWrite,
+  readJson,
+  type ProjectScope,
+} from "./store";
 
 import { proxyRequest, ProxySetupError } from "./ironproxy";
 import { allowedRequest, type AllowedRequest, variableName } from "../shared/environment";
@@ -39,8 +46,22 @@ export class EnvironmentBroker {
   }
 
   private drafts = new Map<string, AllowedRequest[]>();
-  proposals(cwd: string, scope: string, name: string) {
-    return this.drafts.get(JSON.stringify([cwd, scope, name])) ?? [];
+  private draftUpdates = new EventEmitter();
+  proposals(id: string, scope: string, name: string) {
+    return this.drafts.get(JSON.stringify([id, scope, name])) ?? [];
+  }
+  private revisions = new Map<string, number>();
+  async watchProposals(id: string, scope: string, name: string, revision?: number) {
+    const key = JSON.stringify([id, scope, name]);
+    if (revision === (this.revisions.get(key) ?? 0)) {
+      const signal = AbortSignal.any([this.lifetime.signal, AbortSignal.timeout(8000)]);
+      try {
+        await once(this.draftUpdates, key, { signal });
+      } catch (error) {
+        if (!signal.aborted) throw error;
+      }
+    }
+    return { requests: this.proposals(id, scope, name), revision: this.revisions.get(key) ?? 0 };
   }
   async start(): Promise<void> {
     if (process.platform === "win32")
@@ -228,7 +249,7 @@ export class EnvironmentBroker {
         "project_environment_propose_request",
         {
           description:
-            "Suggest a documented HTTPS operation for a protected credential. This creates a temporary draft in this workspace. The owner must review and save it under Protected settings before use.",
+            "Suggest a documented HTTPS operation for a protected credential. This creates a temporary draft for this credential and scope. The owner must choose Allow in Protected settings before use.",
           inputSchema: z.object({ name: variableName, request: allowedRequest }).strict(),
         },
         async ({ name, request: draft }) => {
@@ -242,16 +263,19 @@ export class EnvironmentBroker {
               isError: true,
               content: [{ type: "text", text: "Choose an existing protected credential." }],
             };
-          const key = JSON.stringify([binding.scope.cwd, local ? "workspace" : "project", name]);
+          const id = local ? (await workspaceScope(binding.scope)).id : binding.scope.id;
+          const key = JSON.stringify([id, local ? "workspace" : "project", name]);
           const drafts = (this.drafts.get(key) ?? []).filter((d) => d.id !== draft.id);
           if (drafts.length >= 32 || (!this.drafts.has(key) && this.drafts.size >= 1024))
             return { isError: true, content: [{ type: "text", text: "Proposal limit reached." }] };
           this.drafts.set(key, [...drafts, draft]);
+          this.revisions.set(key, (this.revisions.get(key) ?? 0) + 1);
+          this.draftUpdates.emit(key);
           return {
             content: [
               {
                 type: "text",
-                text: "Draft ready for review in this workspace’s Protected settings.",
+                text: "Draft ready in Protected settings. Choose Allow to activate it immediately.",
               },
             ],
           };

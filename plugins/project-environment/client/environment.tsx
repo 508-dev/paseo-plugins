@@ -213,7 +213,7 @@ function ScopedEnvironment({
         {target &&
           savedVariables?.map((variable) => (
             <VariableCard
-              key={JSON.stringify([variable.name, variable.proxyUrl, variable.requests])}
+              key={JSON.stringify([variable.name, variable.proxyUrl])}
               workspaceId={workspaceId}
               scope={scope}
               requests={variable.requests}

@@ -116,6 +116,15 @@ export const variableTarget = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("workspace"), workspaceId: z.string().min(1) }),
   z.object({ kind: z.literal("project"), scopeId }),
 ]);
+export const watchProposals = defineRpc({
+  name: "environment.watch-proposals",
+  input: z.object({
+    target: variableTarget,
+    name: variableName,
+    revision: z.number().int().optional(),
+  }),
+  output: z.object({ requests: requestList, revision: z.number().int() }),
+});
 export const configureProxy = defineRpc({
   name: "environment.configure-proxy",
   input: z.object({

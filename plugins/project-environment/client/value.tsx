@@ -153,7 +153,6 @@ export function ValueControls({
       {action === "protect" && (
         <ProtectControl
           {...{ name, target, hostId, theme, proxyUrl, proxyMethod, requests }}
-          workspaceId={target.kind === "workspace" ? target.workspaceId : undefined}
           dialogOnly
           onClose={closeAction}
         />
