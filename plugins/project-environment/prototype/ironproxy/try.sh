@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 umask 077
-binary=$(realpath "${1:?Pass the path to the extracted v0.61.0 linux_amd64 iron-proxy binary}")
-digest=c223d05522bba90dc30490964e90d0d43029d55f1f1d4a0d23ca29dd39d54c4e
-[[ $(sha256sum < "$binary" | cut -d' ' -f1) == "$digest" ]] || { echo "Unexpected IronProxy checksum" >&2; exit 1; }
 here=$(cd "$(dirname "$0")" && pwd)
+preview=false
+if [[ ${1:-} == --preview ]]; then preview=true; shift; fi
+binary=${1:-$(command -v iron-proxy || true)}
+if "$preview"; then exec node "$here/setup.mjs" preview "$binary"; fi
+node "$here/setup.mjs" check "$binary"
+binary=$(realpath -- "$binary")
 scratch=$(mktemp -d)
 name="paseo-ironproxy-${scratch##*.}"
 cleanup() {
@@ -28,7 +31,7 @@ docker run -d --name "$name" "${opts[@]}" \
   -v "$scratch/transport:/transport" "$image" node /supervisor.mjs >/dev/null
 run_client() {
   timeout 30 docker run --rm --name "$name-client" "${opts[@]}" \
-    -v "$here/workload.mjs:/workload.mjs:ro" -v "$scratch/transport:/transport:ro" \
+    -v "$here/credential.json:/credential.json:ro" -v "$here/workload.mjs:/workload.mjs:ro" -v "$scratch/transport:/transport:ro" \
     -v "$scratch/fixture/ca.crt:/ca.crt:ro" "$image" node /workload.mjs "$@"
 }
 run_client

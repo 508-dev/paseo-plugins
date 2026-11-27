@@ -5,14 +5,28 @@ import net from "node:net";
 import os from "node:os";
 import { setTimeout as delay } from "node:timers/promises";
 
+const credential = JSON.parse(fs.readFileSync("/credential.json", "utf8"));
+assert.deepEqual(Object.keys(credential).toSorted(), [
+  "caPath",
+  "description",
+  "host",
+  "method",
+  "mode",
+  "name",
+  "path",
+  "socketPath",
+  "usage",
+]);
+assert.equal(credential.mode, "ironproxy");
+
 function request(method, path, hostname = "localhost") {
   return new Promise((resolve, reject) => {
     const req = https.request(
       {
-        socketPath: "/transport/egress.sock",
+        socketPath: credential.socketPath,
         servername: hostname,
         headers: { host: hostname },
-        ca: fs.readFileSync("/ca.crt"),
+        ca: fs.readFileSync(credential.caPath),
         method,
         path,
         agent: false,
@@ -32,7 +46,7 @@ function request(method, path, hostname = "localhost") {
   });
 }
 
-assert.equal(process.env.FIXTURE_SECRET, undefined);
+assert.equal(process.env[credential.name], undefined);
 for (const path of ["/fixture", "/var/run/docker.sock", "/iron-proxy"]) {
   assert.equal(fs.existsSync(path), false);
 }
@@ -53,7 +67,7 @@ await assert.rejects(
 );
 console.log("PASS workload has only loopback; direct fixture connection refused");
 if (process.argv[2] === "proxy-offline") {
-  await assert.rejects(request("GET", "/identity"), (error) =>
+  await assert.rejects(request(credential.method, credential.path, credential.host), (error) =>
     ["ECONNREFUSED", "ENOENT"].includes(error.code),
   );
   console.log("PASS stopping the proxy removes the only route");
@@ -62,7 +76,7 @@ if (process.argv[2] === "proxy-offline") {
 let result;
 for (let attempt = 0; attempt < 50; attempt++) {
   try {
-    result = await request("GET", "/identity");
+    result = await request(credential.method, credential.path, credential.host);
     break;
   } catch (error) {
     if (attempt === 49) throw error;
