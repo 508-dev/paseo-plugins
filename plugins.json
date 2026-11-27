@@ -38,7 +38,7 @@
     "description": "Watch GitHub pull requests and wake their Paseo agents when checks or reviews change",
     "package": "@508-dev/paseo-pr-watcher",
     "version": "0.1.0",
-    "paseo": ">=0.16.0-beta.1 <0.17.0 || 0.17.0-beta.1 || 0.17.3 || 0.17.4",
+    "paseo": ">=0.16.0-beta.1 <0.17.0 || 0.17.0-beta.1 || 0.17.3 || 0.17.4 || 0.17.6",
     "registryId": null,
     "source": {
       "repository": "https://github.com/508-dev/paseo-pr-watcher",
