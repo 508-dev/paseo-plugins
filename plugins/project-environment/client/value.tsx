@@ -20,6 +20,7 @@ interface ValueControlsProps {
   target: VariableTarget;
   hostId: string;
   proxyUrl?: string;
+  proxyMethod?: string;
   name: string;
   description: string;
   theme: PluginTheme;
@@ -30,6 +31,7 @@ export function ValueControls({
   target,
   hostId,
   proxyUrl,
+  proxyMethod,
   name,
   description,
   theme,
@@ -122,11 +124,16 @@ export function ValueControls({
             />
           </>
         )}
+        {compact && children}
         {compact && (
           <CopyDestination name={name} source={target} hostId={hostId} theme={theme} compact />
         )}
       </View>
-      {proxyUrl && <Text style={styles.detail}>Protected · GET {proxyUrl}</Text>}
+      {proxyUrl && (
+        <Text style={styles.detail}>
+          Protected · {proxyMethod ?? "GET"} {proxyUrl}
+        </Text>
+      )}
       {description ? <Text style={styles.detail}>{description}</Text> : null}
       {!proxyUrl && state.revealed !== null ? (
         <Text selectable style={styles.value}>

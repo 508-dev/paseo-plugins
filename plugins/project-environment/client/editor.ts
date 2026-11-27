@@ -40,9 +40,17 @@ export class EnvironmentEditor {
     if (this.state.status === "pending") return;
     this.publish({ [field]: value, status: "idle", message: "" });
   }
-  async save(existingNames: string[] = [], proxyUrl?: string) {
+  async save(
+    existingNames: string[] = [],
+    proxyUrl?: string,
+    proxyMethod?: VariableInput["proxyMethod"],
+  ) {
     if (this.state.status === "pending") return;
-    const result = variableInput.safeParse({ ...this.state, proxyUrl });
+    const result = variableInput.safeParse({
+      ...this.state,
+      proxyUrl,
+      proxyMethod: proxyUrl ? proxyMethod : undefined,
+    });
     if (!result.success) {
       this.publish({
         status: "error",

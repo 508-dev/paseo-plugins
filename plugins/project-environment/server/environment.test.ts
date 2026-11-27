@@ -747,3 +747,25 @@ test("an agent suggestion stays unauthorized until the owner saves the exact ope
   await broker.store.configureProxy(scope, name, url, url, [request], []);
   expect((await client.callTool(call)).isError).toBe(true);
 });
+
+test("catalogue protection supports a write-only first request on a project without a workspace", async () => {
+  const { scope, store } = await fixture();
+  await store.save(scope, { name: "WRITE", description: "", value: "synthetic" });
+  await store.configureProxy(
+    { id: scope.id },
+    "WRITE",
+    null,
+    "https://example.com/item",
+    [],
+    [],
+    "GET",
+    "PATCH",
+  );
+  const [project] = await store.catalogue();
+  expect(project.directory).toBe(scope.cwd);
+  expect(project.variables[0].proxyMethod).toBe("PATCH");
+  await expect(
+    store.configureProxy({ id: scope.id }, "WRITE", "https://example.com/item", null),
+  ).rejects.toThrow("changed");
+  await expect(store.readValue(scope, "WRITE")).rejects.toThrow("IronProxy");
+});

@@ -87,22 +87,23 @@ export class EnvironmentBroker {
         },
         async () => {
           const { variables } = await this.store.readEffective(binding.scope);
-          const metadata = variables.map(({ name, description, proxyUrl, requests }) =>
-            proxyUrl
-              ? {
-                  name,
-                  description,
-                  mode: "ironproxy",
-                  method: "GET",
-                  url: proxyUrl,
-                  operations: [
-                    { id: "default", method: "GET", url: proxyUrl },
-                    ...(requests ?? []),
-                  ],
-                  usage:
-                    "Use project_environment_request with this name and operation ID. To suggest another operation use project_environment_propose_request, then ask the user to approve it in Protected settings. IronProxy supplies the Authorization header.",
-                }
-              : { name, description },
+          const metadata = variables.map(
+            ({ name, description, proxyUrl, proxyMethod, requests }) =>
+              proxyUrl
+                ? {
+                    name,
+                    description,
+                    mode: "ironproxy",
+                    method: proxyMethod ?? "GET",
+                    url: proxyUrl,
+                    operations: [
+                      { id: "default", method: proxyMethod ?? "GET", url: proxyUrl },
+                      ...(requests ?? []),
+                    ],
+                    usage:
+                      "Use project_environment_request with this name and operation ID. To suggest another operation use project_environment_propose_request, then ask the user to approve it in Protected settings. IronProxy supplies the Authorization header.",
+                  }
+                : { name, description },
           );
           return { content: [{ type: "text", text: JSON.stringify({ variables: metadata }) }] };
         },
@@ -162,11 +163,11 @@ export class EnvironmentBroker {
         "project_environment_request",
         {
           description:
-            "Call an approved operation by ID. Omit operation for the default GET. For write operations body may be a JSON string.",
+            "Call an approved operation by ID. Omit operation for a default GET. For write operations body may be a JSON string.",
           inputSchema: z
             .object({
               name: variableName,
-              operation: z.string().max(64).default("default"),
+              operation: z.string().max(64).optional(),
               body: z.string().max(65536).optional(),
             })
             .strict(),
@@ -186,8 +187,8 @@ export class EnvironmentBroker {
                 ],
               };
             const selected =
-              operation === "default"
-                ? { method: "GET", url: credential.proxyUrl }
+              operation === "default" || (!operation && (credential.proxyMethod ?? "GET") === "GET")
+                ? { method: credential.proxyMethod ?? "GET", url: credential.proxyUrl }
                 : credential.requests?.find((r) => r.id === operation);
             if (!selected || (selected.method === "GET" && body !== undefined))
               return {

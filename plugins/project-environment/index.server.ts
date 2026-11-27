@@ -133,18 +133,22 @@ export default function contribute(server: PluginServerContext) {
     ]);
     return {
       scopeId: project.id,
-      variables: variables.map(({ name, description, proxyUrl, requests }) => ({
+      variables: variables.map(({ name, description, proxyUrl, proxyMethod, requests }) => ({
         name,
         description,
         proxyUrl,
+        proxyMethod,
         requests,
       })),
-      workspaceVariables: workspaceVariables.map(({ name, description, proxyUrl, requests }) => ({
-        name,
-        description,
-        proxyUrl,
-        requests,
-      })),
+      workspaceVariables: workspaceVariables.map(
+        ({ name, description, proxyUrl, proxyMethod, requests }) => ({
+          name,
+          description,
+          proxyUrl,
+          proxyMethod,
+          requests,
+        }),
+      ),
     };
   });
   server.handle(proxyStatus, async () => {
@@ -162,17 +166,21 @@ export default function contribute(server: PluginServerContext) {
   });
   server.handle(
     configureProxy,
-    async ({ workspaceId, scope, name, expected, url, previousRequests, requests }, { paseo }) => {
+    async (
+      { target, name, expected, url, previousRequests, requests, previousMethod, method },
+      { paseo },
+    ) => {
       await start();
       if (url) await verifyProxy();
-      const project = await resolveProject(paseo, workspaceId);
       await broker.store.configureProxy(
-        scope === "workspace" ? await workspaceScope(project) : project,
+        await resolveSource(paseo, target),
         name,
         expected,
         url,
         previousRequests,
         requests,
+        previousMethod,
+        method,
       );
       return {};
     },

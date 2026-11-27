@@ -223,24 +223,31 @@ export class EnvironmentStore {
   }
 
   async configureProxy(
-    scope: StorageScope,
+    scope: StorageKey & { cwd?: string },
     name: string,
     expected: string | null,
     url: string | null,
     previousRequests: NonNullable<Variable["requests"]> = [],
     requests: NonNullable<Variable["requests"]> = [],
+    previousMethod: NonNullable<Variable["proxyMethod"]> = "GET",
+    method: NonNullable<Variable["proxyMethod"]> = "GET",
   ) {
-    return this.change(scope, (variables) => {
+    return this.enqueue(async () => {
+      const document = await readJson(this.file(scope));
+      const directory = z.object({ directory: z.string().optional() }).parse(document).directory;
+      const variables = await this.read(scope);
       const entry = variables.find((v) => v.name === name);
       if (
         !entry ||
         (entry.proxyUrl ?? null) !== expected ||
+        (entry.proxyMethod ?? "GET") !== previousMethod ||
         JSON.stringify(entry.requests ?? []) !== JSON.stringify(previousRequests)
       )
         throw new Error("Credential changed. Refresh and retry.");
       entry.requests = url && requests.length ? requests : undefined;
       entry.proxyUrl = url ?? undefined;
-      return variables;
+      entry.proxyMethod = url && method !== "GET" ? method : undefined;
+      await this.write({ ...scope, cwd: directory }, variables);
     });
   }
 
@@ -285,7 +292,7 @@ export class EnvironmentStore {
     });
   }
 
-  private write(scope: StorageScope, variables: Variable[]) {
+  private write(scope: StorageKey & { cwd?: string }, variables: Variable[]) {
     const records = variables.map(({ value, ...metadata }) =>
       metadata.proxyUrl ? { ...metadata, proxyValue: value } : { ...metadata, value },
     );

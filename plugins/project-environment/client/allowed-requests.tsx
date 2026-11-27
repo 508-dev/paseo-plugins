@@ -13,6 +13,7 @@ import {
 import { ActionButton } from "./action-button";
 import { Field } from "./field";
 
+const actions = { alignSelf: "flex-start" as const };
 const methods = requestMethod.options.map((value) => ({ value, label: value }));
 export function AllowedRequests({
   theme,
@@ -26,7 +27,7 @@ export function AllowedRequests({
   disabled,
 }: {
   theme: PluginTheme;
-  workspaceId: string;
+  workspaceId?: string;
   scope: "project" | "workspace";
   hostId: string;
   name: string;
@@ -42,7 +43,8 @@ export function AllowedRequests({
   const read = useRpc(proposedRequests);
   const drafts = useQuery({
     queryKey: ["environment-proposals", hostId, workspaceId, scope, name],
-    queryFn: () => read({ workspaceId, scope, name }),
+    enabled: Boolean(workspaceId),
+    queryFn: () => read({ workspaceId: workspaceId ?? "", scope, name }),
     refetchInterval: 5000,
   });
   const valid = allowedRequest.safeParse({ id, method, url });
@@ -72,7 +74,7 @@ export function AllowedRequests({
   );
   return (
     <>
-      <Text style={title}>Allowed requests</Text>
+      <Text style={title}>Additional requests</Text>
       {items.map((r) => (
         <RequestRow
           key={r.id}
@@ -83,7 +85,9 @@ export function AllowedRequests({
           disabled={disabled}
         />
       ))}
-      <ActionButton label="Add request" theme={theme} onPress={start} disabled={disabled} />
+      <View style={actions}>
+        <ActionButton label="+ Add request" theme={theme} onPress={start} disabled={disabled} />
+      </View>
       {drafts.data?.requests
         .filter(
           (r) => !items.some((v) => v.id === r.id && v.method === r.method && v.url === r.url),

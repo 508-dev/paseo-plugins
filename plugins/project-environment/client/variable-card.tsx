@@ -3,14 +3,13 @@ import { messages } from "./messages";
 import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
 import { Text, View } from "react-native";
 import type { PluginTheme } from "@getpaseo/plugin";
-import { AllowedRequests } from "./allowed-requests";
+import { ProtectControl } from "./protect-control";
 import { ActionButton } from "./action-button";
-import { ProxyRouteField } from "./proxy-route-field";
+
 import { Field } from "./field";
 import { SavedVariableEditor } from "./saved-variable-editor";
 import { ValueControls } from "./value";
 import {
-  proxyRoute,
   type AllowedRequest,
   type variableInput,
   type VariableTarget,
@@ -24,13 +23,7 @@ interface VariableCardProps {
   scope: "workspace" | "project";
   requests?: AllowedRequest[];
   proxyUrl?: string;
-  setRoute(
-    name: string,
-    expected: string | null,
-    url: string | null,
-    previousRequests: AllowedRequest[],
-    requests: AllowedRequest[],
-  ): Promise<void>;
+  proxyMethod?: AllowedRequest["method"];
   name: string;
   description: string;
   theme: PluginTheme;
@@ -41,10 +34,9 @@ export function VariableCard({
   target,
   hostId,
   workspaceId,
-  scope,
   requests,
   proxyUrl,
-  setRoute,
+  proxyMethod,
   name,
   description,
   theme,
@@ -52,37 +44,6 @@ export function VariableCard({
   remove,
 }: VariableCardProps) {
   const { t } = useTranslation(messages);
-  const [routing, setRouting] = useState(false);
-  const [items, setItems] = useState(requests ?? []);
-  const [route, setUrl] = useState(proxyUrl ?? "");
-  const [busy, setBusy] = useState(false);
-  const [routeError, setRouteError] = useState("");
-  const apply = useCallback(
-    async (url: string | null) => {
-      setBusy(true);
-      setRouteError("");
-      try {
-        await setRoute(name, proxyUrl ?? null, url, requests ?? [], items);
-        setRouting(false);
-      } catch {
-        setRouteError(
-          "Could not change credential access. Check the saved entry and install the approved IronProxy v0.61.0 binary on the Paseo host.",
-        );
-      } finally {
-        setBusy(false);
-      }
-    },
-    [name, proxyUrl, setRoute, requests, items],
-  );
-  const saveRoute = useCallback(() => void apply(route), [apply, route]);
-  const clearRoute = useCallback(() => void apply(null), [apply]);
-  const toggleRouting = useCallback(() => {
-    setItems(requests ?? []);
-    setUrl(proxyUrl ?? "");
-    setRouteError("");
-    setRouting((open) => !open);
-  }, [requests, proxyUrl]);
-  const closeRouting = useCallback(() => setRouting(false), []);
   const [editor] = useState(() => new SavedVariableEditor(name, { save, remove }));
   const state = useSyncExternalStore(editor.subscribe, editor.getState);
   const pending = state.status === "pending";
@@ -137,52 +98,20 @@ export function VariableCard({
       {state.mode === "view" ? (
         <ValueControls
           proxyUrl={proxyUrl}
+          proxyMethod={proxyMethod}
           target={target}
           hostId={hostId}
           name={name}
           description={description}
           theme={theme}
         >
-          <ActionButton
-            label={proxyUrl ? "Protected settings" : "Protect"}
-            onPress={toggleRouting}
-            theme={theme}
+          <ProtectControl
+            {...{ name, proxyMethod, proxyUrl, requests, workspaceId, hostId, theme, target }}
           />
           <ActionButton label={t("replace")} onPress={begin} theme={theme} />
           <ActionButton label={t("remove")} onPress={editor.confirmRemove} theme={theme} />
         </ValueControls>
       ) : null}
-      {routing && state.mode === "view" && (
-        <View style={styles.confirmation}>
-          <ProxyRouteField value={route} onChangeText={setUrl} disabled={busy} theme={theme} />
-          <AllowedRequests
-            {...{ theme, workspaceId, scope, hostId, name, items, setItems }}
-            base={route}
-            disabled={busy}
-          />
-          <ActionButton
-            label="Save allowed requests"
-            onPress={saveRoute}
-            disabled={busy || !proxyRoute.safeParse(route).success}
-            theme={theme}
-          />
-          {proxyUrl && (
-            <ActionButton
-              label="Allow commands to read the raw value again"
-              variant="destructive"
-              disabled={busy}
-              theme={theme}
-              onPress={clearRoute}
-            />
-          )}
-          <ActionButton label={t("cancel")} disabled={busy} theme={theme} onPress={closeRouting} />
-          {routeError && (
-            <Text accessibilityRole="alert" style={styles.error}>
-              {routeError}
-            </Text>
-          )}
-        </View>
-      )}
       {state.mode === "replace" ? (
         <>
           <Field

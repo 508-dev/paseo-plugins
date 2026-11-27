@@ -47,6 +47,7 @@ export const variableMetadata = z.object({
   name: variableName,
   description: z.string().max(500),
   proxyUrl: proxyRoute.optional(),
+  proxyMethod: requestMethod.optional(),
   requests: requestList.optional(),
 });
 export const variableInput = variableMetadata.extend({
@@ -72,17 +73,6 @@ export const proxyStatus = defineRpc({
     z.object({ ready: z.literal(true) }),
     z.object({ ready: z.literal(false), detail: z.string() }),
   ]),
-});
-export const configureProxy = defineRpc({
-  name: "environment.configure-proxy",
-  input: editScope.extend({
-    name: variableName,
-    expected: proxyRoute.nullable(),
-    previousRequests: requestList.default([]),
-    requests: requestList.default([]),
-    url: proxyRoute.nullable(),
-  }),
-  output: z.object({}),
 });
 export const scopeId = z.string().regex(/^[a-f0-9]{64}$/);
 export const listVariables = defineRpc({
@@ -126,6 +116,20 @@ export const variableTarget = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("workspace"), workspaceId: z.string().min(1) }),
   z.object({ kind: z.literal("project"), scopeId }),
 ]);
+export const configureProxy = defineRpc({
+  name: "environment.configure-proxy",
+  input: z.object({
+    target: variableTarget,
+    method: requestMethod.default("GET"),
+    previousMethod: requestMethod.default("GET"),
+    name: variableName,
+    expected: proxyRoute.nullable(),
+    previousRequests: requestList.default([]),
+    requests: requestList.default([]),
+    url: proxyRoute.nullable(),
+  }),
+  output: z.object({}),
+});
 export type VariableTarget = z.infer<typeof variableTarget>;
 export const readVariableValue = defineRpc({
   name: "environment.value",

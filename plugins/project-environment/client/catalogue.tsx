@@ -10,6 +10,7 @@ import {
   type CatalogueProject,
   type VariableTarget,
 } from "../shared/environment";
+import { ProtectControl } from "./protect-control";
 import { ValueControls } from "./value";
 import { ActionButton } from "./action-button";
 import { ProxyStatus } from "./proxy-status";
@@ -303,7 +304,14 @@ function VariableRows({
   );
   return variables.map((variable) => (
     <View key={JSON.stringify([variable.name, variable.proxyUrl])} style={row}>
-      <ValueControls {...variable} {...{ theme, hostId, target }} compact />
+      <ValueControls {...variable} {...{ theme, hostId, target }} compact>
+        <ProtectControl
+          {...variable}
+          {...{ theme, hostId, target }}
+          workspaceId={target.kind === "workspace" ? target.workspaceId : undefined}
+          compact
+        />
+      </ValueControls>
     </View>
   ));
 }

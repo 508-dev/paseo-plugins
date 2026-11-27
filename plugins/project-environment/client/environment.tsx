@@ -12,7 +12,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { z } from "zod";
 import {
   type AllowedRequest,
-  configureProxy,
   proxyRoute,
   listVariables,
   saveVariable,
@@ -66,7 +65,7 @@ function ScopedEnvironment({
   const [useProxy, setUseProxy] = useState(false);
   const toggleProxy = useCallback(() => setUseProxy((active) => !active), []);
   const [url, setUrl] = useState("");
-  const configure = useRpc(configureProxy);
+  const [method, setMethod] = useState<AllowedRequest["method"]>("GET");
   const list = useRpc(listVariables);
   const save = useRpc(saveVariable);
   const remove = useRpc(removeVariable);
@@ -84,27 +83,6 @@ function ScopedEnvironment({
       queryClient.invalidateQueries({ queryKey: ["project-environment-catalogue"] }),
     ]);
   }, [queryClient]);
-  const setRoute = useCallback(
-    async (
-      name: string,
-      expected: string | null,
-      endpoint: string | null,
-      previousRequests: AllowedRequest[],
-      requests: AllowedRequest[],
-    ) => {
-      await configure({
-        workspaceId,
-        scope,
-        name,
-        expected,
-        url: endpoint,
-        previousRequests,
-        requests,
-      });
-      await invalidate();
-    },
-    [configure, workspaceId, scope, invalidate],
-  );
   const [bulk, setBulk] = useState(false);
   const openBulk = useCallback(() => {
     setNotice(null);
@@ -183,8 +161,8 @@ function ScopedEnvironment({
   }, [data, isProject, workspaceId]);
   const submit = useCallback(() => {
     const existingNames = savedVariables?.map((variable) => variable.name) ?? [];
-    void editor.save(existingNames, useProxy ? url : undefined);
-  }, [editor, savedVariables, useProxy, url]);
+    void editor.save(existingNames, useProxy ? url : undefined, method);
+  }, [editor, savedVariables, useProxy, url, method]);
   let messageStyle = styles.detail;
   if (form.status === "error") messageStyle = styles.error;
   if (form.status === "saved") messageStyle = styles.success;
@@ -243,7 +221,7 @@ function ScopedEnvironment({
               scope={scope}
               requests={variable.requests}
               proxyUrl={variable.proxyUrl}
-              setRoute={setRoute}
+              proxyMethod={variable.proxyMethod}
               target={target}
               hostId={host.id}
               name={variable.name}
@@ -301,7 +279,14 @@ function ScopedEnvironment({
               onPress={toggleProxy}
             />
             {useProxy && (
-              <ProxyRouteField theme={theme} value={url} onChangeText={setUrl} disabled={pending} />
+              <ProxyRouteField
+                method={method}
+                setMethod={setMethod}
+                theme={theme}
+                value={url}
+                onChangeText={setUrl}
+                disabled={pending}
+              />
             )}
             <View style={styles.actions}>
               <ActionButton
