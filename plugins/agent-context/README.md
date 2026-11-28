@@ -24,6 +24,12 @@ Snapshots include user and assistant messages and fixed tool-kind markers. They 
 
 Only non-archived top-level Paseo agents are listed. The generic attachment flow owns draft persistence, duplicate handling, preview, and removal. Removing a pill detaches it from the draft; it does not delete the source agent.
 
+## Search what was said
+
+In an existing agent, open **Search agent transcripts** from the Command Center. Choose a source with the screen’s host picker and press **Search** to fetch matching excerpts into the app. Search checks the latest 100 projected timeline entries of up to 20 recent eligible agents on that host. It ignores reasoning and tool calls. Each result previews the latest literal match and nearby user or assistant messages.
+
+Choose **Attach to …** to stage the displayed excerpt in the agent that opened the screen. The source host is included in the text. The destination receives it when you send the draft. Install the plugin on both participating hosts to use this route across hosts. Direct attachment from the preview uses the composer API available in Paseo 0.16 and later. Use **Copy excerpt** on earlier clients that support plugin screens, or use the original **+** picker for same-host snapshots.
+
 ## Develop
 
 ```sh
